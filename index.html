@@ -115,6 +115,19 @@
          border-radius:10px;padding:10px 12px;white-space:pre-wrap;word-break:break-word}
   .yours .extra{color:var(--close)}
   .alt{color:var(--muted);font-size:.82rem;margin-top:6px}
+  /* multi-box cards: one labelled input per field */
+  .fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:12px}
+  .fld{display:flex;flex-direction:column;gap:6px;text-align:left}
+  .fld span{font-size:.7rem;text-transform:uppercase;letter-spacing:.12em;color:var(--muted)}
+  .fin{width:100%;background:var(--panel);border:1px solid var(--line);color:var(--text);border-radius:12px;padding:12px 14px;font:inherit;font-size:1rem;outline:none;transition:.25s}
+  .fin:focus{border-color:var(--accent);box-shadow:0 0 0 4px color-mix(in srgb,var(--accent) 12%,transparent),0 0 30px color-mix(in srgb,var(--accent) 13%,transparent)}
+  .fin:disabled{opacity:.55}
+  .frow{padding:10px 12px;margin-bottom:8px;border:1px solid var(--line);border-left:3px solid var(--line);border-radius:10px;background:#00000022}
+  .frow.good{border-left-color:var(--good)} .frow.close{border-left-color:var(--close)} .frow.bad{border-left-color:var(--bad)}
+  .fhead{display:flex;justify-content:space-between;align-items:baseline}
+  .fhead .label{margin:0}
+  .fscore{font-family:'JetBrains Mono',monospace;font-size:.8rem}
+  .yours.small{font-size:.75rem;margin-top:6px;padding:6px 8px}
 
   .inputbox{position:relative}
   textarea{width:100%;min-height:96px;resize:vertical;background:var(--panel);border:1px solid var(--line);color:var(--text);
@@ -184,18 +197,22 @@
             <div class="ring" id="ring"><span id="pct">0%</span></div>
             <div><h3 id="vTitle">Nice</h3><p id="vSub"></p></div>
           </div>
-          <div class="label">Answer</div>
-          <div class="answer" id="answer"></div>
-          <div class="alt" id="alt"></div>
-          <div class="label">You wrote</div>
-          <div class="yours" id="yours"></div>
+          <div id="singleBack">
+            <div class="label">Answer</div>
+            <div class="answer" id="answer"></div>
+            <div class="alt" id="alt"></div>
+            <div class="label">You wrote</div>
+            <div class="yours" id="yours"></div>
+          </div>
+          <div id="multiBack" class="hidden"></div>
         </div>
       </div>
     </div>
 
-    <div class="inputbox">
+    <div class="inputbox" id="inputBox">
       <textarea id="input" placeholder="Type your answer…" autocomplete="off" spellcheck="false"></textarea>
     </div>
+    <div class="fields hidden" id="fields"></div>
     <div class="row">
       <div class="hint" id="hint"><kbd>Enter</kbd> check · <kbd>Shift</kbd>+<kbd>Enter</kbd> new line · <kbd>Alt</kbd>+<kbd>H</kbd> hint</div>
       <button class="btn ghost" id="hintBtn">💡 First-letter hint</button>
@@ -257,35 +274,39 @@ const CARDS = [{"t":"Greek art: Humanism","g":"Greek Art","a":["Man is the measu
 {"t":"1.2 Archaic (Greek period)","g":"Greek Art","a":["Life-size 3D carved marble (glyptic) inspired by Egypt, but stiff, rigid frontal pose with a fixed \"Archaic smile\"."],"p":"Describe it in one sentence."},
 {"t":"1.3 Classical (Greek period)","g":"Greek Art","a":["\"The Greek Ideal\" (Idealism)—relaxed contrapposto weight shift (S-curve), idealised muscles, and a calm, emotionless face."],"p":"Describe it in one sentence."},
 {"t":"1.4 Hellenistic (Greek period)","g":"Greek Art","a":["Opposite of Classical calm—raw agony/emotion, unstable twisting diagonal poses, and realism.","Opposite of Classical calm—raw agony/emotion, unstable twisting diagonal poses, and realism (pain, old age)."],"show":"Opposite of Classical calm—raw agony/emotion, unstable twisting diagonal poses, and realism (pain, old age).","p":"Describe it in one sentence."},
-{"t":"Archaic 3D sculpture (nude, freestanding)","g":"Greek Art","a":["Kouros from Tenea"],"p":"Name this artwork.","img":"kouros"},
-{"t":"Kouros from Tenea: artist","g":"Greek Art","a":["Anonymous"],"p":"Who is the artist?","img":"kouros"},
-{"t":"Kouros from Tenea: location","g":"Greek Art","a":["Tenea, Greece","Tenea (near Corinth), Greece"],"show":"Tenea (near Corinth), Greece","p":"Where is it?","img":"kouros"},
-{"t":"Kouros from Tenea: medium","g":"Greek Art","a":["Glyptic carved marble"],"p":"What is it made of / what medium?","img":"kouros"},
+{"t":"Name this artwork (1/12)","g":"Greek Art","p":"Fill in every box.","img":"kouros","sum":"Kouros from Tenea","fields":[{"k":"Name","a":["Kouros from Tenea"]},
+{"k":"Artist","a":["Anonymous"]},
+{"k":"Location","a":["Tenea, Greece","Tenea (near Corinth), Greece"],"show":"Tenea (near Corinth), Greece"},
+{"k":"Medium","a":["Glyptic carved marble"]},
+{"k":"Period","a":["Archaic"]}]},
 {"t":"Kouros from Tenea: Egyptian influence","g":"Greek Art","a":["Rigid frontal pose, left foot stepping forward, arms clenched stiffly at sides","Rigid frontal pose, left foot stepping forward (weight equally on both flat feet), arms clenched stiffly at sides"],"show":"Rigid frontal pose, left foot stepping forward (weight equally on both flat feet), arms clenched stiffly at sides","p":"Give the exam point.","img":"kouros"},
 {"t":"Kouros from Tenea: break from Egypt","g":"Greek Art","a":["Completely nude and freestanding","Completely nude and freestanding (no back-pillar)"],"show":"Completely nude and freestanding (no back-pillar)","p":"Give the exam point.","img":"kouros"},
 {"t":"Kouros from Tenea: thighs and calves","g":"Greek Art","a":["Rounded thighs/calves"],"p":"Give the exam point.","img":"kouros"},
 {"t":"Kouros from Tenea: the head","g":"Greek Art","a":["Cubic head with beaded hair and the fixed \"Archaic smile\"","Cubic head with beaded hair and the fixed \"Archaic smile\" (showing life)"],"show":"Cubic head with beaded hair and the fixed \"Archaic smile\" (showing life)","p":"Give the exam point.","img":"kouros"},
 {"t":"Female Kore statues: how were they treated?","g":"Greek Art","a":["Clothed and painted with encaustic hot wax"],"p":"Complete it.","img":"kouros"},
-{"t":"Classical 3D sculpture (the athlete's pose)","g":"Greek Art","a":["Spear Bearer (Doryphoros)","Spear Bearer","Doryphoros"],"p":"Name this artwork.","img":"dory"},
-{"t":"Spear Bearer: artist","g":"Greek Art","a":["Polykleitos"],"p":"Who is the artist?","img":"dory"},
-{"t":"Spear Bearer: location","g":"Greek Art","a":["Greece","Greece (Roman copy from Pompeii, in Naples, Italy)"],"show":"Greece (Roman copy from Pompeii, in Naples, Italy)","p":"Where is it?","img":"dory"},
-{"t":"Spear Bearer: medium","g":"Greek Art","a":["Original: Bronze; Copy: Carved marble","Original: Bronze; Copy: Carved marble (with tree-stump support)"],"show":"Original: Bronze; Copy: Carved marble (with tree-stump support)","p":"What is it made of / what medium?","img":"dory"},
+{"t":"Name this artwork (2/12)","g":"Greek Art","p":"Fill in every box.","img":"dory","sum":"Spear Bearer (Doryphoros)","fields":[{"k":"Name","a":["Spear Bearer (Doryphoros)","Spear Bearer","Doryphoros"]},
+{"k":"Artist","a":["Polykleitos"]},
+{"k":"Location","a":["Greece","Greece (Roman copy from Pompeii, in Naples, Italy)"],"show":"Greece (Roman copy from Pompeii, in Naples, Italy)"},
+{"k":"Medium","a":["Original: Bronze; Copy: Carved marble","Original: Bronze; Copy: Carved marble (with tree-stump support)"],"show":"Original: Bronze; Copy: Carved marble (with tree-stump support)"},
+{"k":"Period","a":["Classical"]}]},
 {"t":"Spear Bearer: what it shows","g":"Greek Art","a":["Shows \"The Greek Ideal\"—flawless mathematical proportions of an athletic \"type\"","Shows \"The Greek Ideal\" (Idealism)—flawless mathematical proportions of an athletic \"type\""],"show":"Shows \"The Greek Ideal\" (Idealism)—flawless mathematical proportions of an athletic \"type\"","p":"Give the exam point.","img":"dory"},
 {"t":"Spear Bearer: the weight","g":"Greek Art","a":["Contrapposto: all weight on one straight right leg, left leg bent relaxed behind"],"p":"Give the exam point.","img":"dory"},
 {"t":"Spear Bearer: hips and shoulders","g":"Greek Art","a":["Hips and shoulders tilt in a natural S-curve with limbs freed from torso"],"p":"Give the exam point.","img":"dory"},
 {"t":"Spear Bearer: the face","g":"Greek Art","a":["Calm, relaxed, emotionless face","Calm, relaxed, emotionless face (rational self-control)"],"show":"Calm, relaxed, emotionless face (rational self-control)","p":"Give the exam point.","img":"dory"},
-{"t":"Hellenistic 3D sculpture (agony)","g":"Greek Art","a":["The Laocoön","The Laocoon","Laocoön","Laocoon"],"p":"Name this artwork.","img":"laocoon"},
-{"t":"The Laocoön: artist","g":"Greek Art","a":["Hagesandros, Polydoros & Athenodoros"],"p":"Who is the artist?","img":"laocoon"},
-{"t":"The Laocoön: location","g":"Greek Art","a":["Rhodes, Greece / Vatican Museums, Rome"],"p":"Where is it?","img":"laocoon"},
-{"t":"The Laocoön: medium","g":"Greek Art","a":["Carved marble"],"p":"What is it made of / what medium?","img":"laocoon"},
+{"t":"Name this artwork (3/12)","g":"Greek Art","p":"Fill in every box.","img":"laocoon","sum":"The Laocoön","fields":[{"k":"Name","a":["The Laocoön","The Laocoon","Laocoön","Laocoon"]},
+{"k":"Artist","a":["Hagesandros, Polydoros & Athenodoros"]},
+{"k":"Location","a":["Rhodes, Greece / Vatican Museums, Rome"]},
+{"k":"Medium","a":["Carved marble"]},
+{"k":"Period","a":["Hellenistic"]}]},
 {"t":"Hellenistic marble group: the story","g":"Greek Art","a":["Trojan priest Laocoön and his two sons strangled by sea snakes"],"p":"Give the exam point.","img":"laocoon"},
 {"t":"Hellenistic marble group: the emotion","g":"Greek Art","a":["Raw emotion & agony: heads flung back, faces contorted in pain"],"p":"Give the exam point.","img":"laocoon"},
 {"t":"Hellenistic marble group: the pose","g":"Greek Art","a":["Unstable, off-balance diagonal pose"],"p":"Give the exam point.","img":"laocoon"},
 {"t":"Hellenistic marble group: muscles and shadow","g":"Greek Art","a":["Hyper-realistic straining muscles & veins with deep shadows as snakes bind all three figures together","Hyper-realistic straining muscles & veins with deep shadows (chiaroscuro) as snakes bind all three figures together"],"show":"Hyper-realistic straining muscles & veins with deep shadows (chiaroscuro) as snakes bind all three figures together","p":"Give the exam point.","img":"laocoon"},
-{"t":"Greek building: temple on the hilltop","g":"Greek Art","a":["The Parthenon","Parthenon"],"p":"Name this artwork.","img":"parthenon"},
-{"t":"The Parthenon: architect","g":"Greek Art","a":["Iktinos & Kallikrates","Iktinos & Kallikrates (sculptures by Phidias; patron Pericles)"],"show":"Iktinos & Kallikrates (sculptures by Phidias; patron Pericles)","p":"Who is the architect?","img":"parthenon"},
-{"t":"The Parthenon: location","g":"Greek Art","a":["Acropolis, Athens, Greece"],"p":"Where is it?","img":"parthenon"},
-{"t":"The Parthenon: medium","g":"Greek Art","a":["Pentelic marble","Pentelic marble (Doric post-and-lintel temple)"],"show":"Pentelic marble (Doric post-and-lintel temple)","p":"What is it made of / what medium?","img":"parthenon"},
+{"t":"Name this artwork (4/12)","g":"Greek Art","p":"Fill in every box.","img":"parthenon","sum":"The Parthenon","fields":[{"k":"Name","a":["The Parthenon","Parthenon"]},
+{"k":"Architect","a":["Iktinos & Kallikrates","Iktinos & Kallikrates (sculptures by Phidias; patron Pericles)"],"show":"Iktinos & Kallikrates (sculptures by Phidias; patron Pericles)"},
+{"k":"Location","a":["Acropolis, Athens, Greece"]},
+{"k":"Medium","a":["Pentelic marble","Pentelic marble (Doric post-and-lintel temple)"],"show":"Pentelic marble (Doric post-and-lintel temple)"},
+{"k":"Period","a":["Greek","Greek Art","Ancient Greek"]}]},
 {"t":"Greek hilltop temple: its purpose","g":"Greek Art","a":["Temple to Athena Parthenos & city treasury on the hilltop Acropolis","Temple to Athena Parthenos (goddess of wisdom) & city treasury on the hilltop Acropolis"],"show":"Temple to Athena Parthenos (goddess of wisdom) & city treasury on the hilltop Acropolis","p":"Give the exam point.","img":"parthenon"},
 {"t":"Greek hilltop temple: construction","g":"Greek Art","a":["Uses Post-and-Lintel construction","Uses Post-and-Lintel construction (vertical columns + horizontal entablature)"],"show":"Uses Post-and-Lintel construction (vertical columns + horizontal entablature)","p":"Give the exam point.","img":"parthenon"},
 {"t":"Greek hilltop temple: order and roof ends","g":"Greek Art","a":["Built in the sturdy Doric Order topped by triangular pediments"],"p":"Give the exam point.","img":"parthenon"},
@@ -299,19 +320,21 @@ const CARDS = [{"t":"Greek art: Humanism","g":"Greek Art","a":["Man is the measu
 {"t":"Core rule of Roman art","g":"Roman Art","a":["Art served realism, public entertainment, and political propaganda for the Emperor."],"p":"Complete it."},
 {"t":"Roman artists: who were they?","g":"Roman Art","a":["Anonymous"]},
 {"t":"Roman painting (Theseus, Pompeii, fresco): what did it already have?","g":"Roman Art","a":["3D naturalism, contrapposto, chiaroscuro shading, and cast shadows","3D naturalism, contrapposto, chiaroscuro shading, and cast shadows (which was later lost in the Middle Ages)"],"show":"3D naturalism, contrapposto, chiaroscuro shading, and cast shadows (which was later lost in the Middle Ages)","p":"List them."},
-{"t":"Roman 3D propaganda sculpture (the emperor)","g":"Roman Art","a":["Prima Porta Augustus"],"p":"Name this artwork.","img":"augustus"},
-{"t":"Prima Porta Augustus: artist","g":"Roman Art","a":["Anonymous"],"p":"Who is the artist?","img":"augustus"},
-{"t":"Prima Porta Augustus: location","g":"Roman Art","a":["Rome, Italy","Rome, Italy (Vatican Museums)"],"show":"Rome, Italy (Vatican Museums)","p":"Where is it?","img":"augustus"},
-{"t":"Prima Porta Augustus: medium","g":"Roman Art","a":["Carved marble"],"p":"What is it made of / what medium?","img":"augustus"},
+{"t":"Name this artwork (5/12)","g":"Roman Art","p":"Fill in every box.","img":"augustus","sum":"Prima Porta Augustus","fields":[{"k":"Name","a":["Prima Porta Augustus"]},
+{"k":"Artist","a":["Anonymous"]},
+{"k":"Location","a":["Rome, Italy","Rome, Italy (Vatican Museums)"],"show":"Rome, Italy (Vatican Museums)"},
+{"k":"Medium","a":["Carved marble"]},
+{"k":"Period","a":["Roman","Roman Art","Ancient Roman"]}]},
 {"t":"Prima Porta propaganda 1: Youthful Greek Idealisation","g":"Roman Art","a":["Copies the contrapposto pose of the Greek Spear Bearer with a calm, eternally young face."],"p":"Give the exam point.","img":"augustus"},
 {"t":"Prima Porta propaganda 2: Orator's Gesture","g":"Roman Art","a":["Right arm raised to address his troops with calm authority."],"p":"Give the exam point.","img":"augustus"},
 {"t":"Prima Porta propaganda 3: Breastplate (Armour) Reliefs","g":"Roman Art","a":["Shows Parthians returning Roman standards under sky/earth gods = Augustus brought divine peace & victory."],"p":"Give the exam point.","img":"augustus"},
 {"t":"Prima Porta propaganda 4: Cupid on a Dolphin at Foot","g":"Roman Art","a":["Cupid is the son of Venus = claims Augustus's family has divine ancestry from the gods."],"p":"Give the exam point.","img":"augustus"},
 {"t":"Prima Porta propaganda 5: Bare Feet","g":"Roman Art","a":["Symbol that Augustus is a god / divine hero."],"p":"Give the exam point.","img":"augustus"},
-{"t":"Roman architecture (entertainment for the people)","g":"Roman Art","a":["The Colosseum","Colosseum"],"p":"Name this artwork.","img":"colosseum"},
-{"t":"The Colosseum: architect","g":"Roman Art","a":["Anonymous"],"p":"Who is the architect?","img":"colosseum"},
-{"t":"The Colosseum: location","g":"Roman Art","a":["Rome, Italy"],"p":"Where is it?","img":"colosseum"},
-{"t":"The Colosseum: medium","g":"Roman Art","a":["Roman pozzolana concrete, stone, brick & barrel/groin vaults","Roman pozzolana concrete (volcanic ash mortar), stone, brick & barrel/groin vaults"],"show":"Roman pozzolana concrete (volcanic ash mortar), stone, brick & barrel/groin vaults","p":"What is it made of / what medium?","img":"colosseum"},
+{"t":"Name this artwork (6/12)","g":"Roman Art","p":"Fill in every box.","img":"colosseum","sum":"The Colosseum","fields":[{"k":"Name","a":["The Colosseum","Colosseum"]},
+{"k":"Architect","a":["Anonymous"]},
+{"k":"Location","a":["Rome, Italy"]},
+{"k":"Medium","a":["Roman pozzolana concrete, stone, brick & barrel/groin vaults","Roman pozzolana concrete (volcanic ash mortar), stone, brick & barrel/groin vaults"],"show":"Roman pozzolana concrete (volcanic ash mortar), stone, brick & barrel/groin vaults"},
+{"k":"Period","a":["Roman","Roman Art","Ancient Roman"]}]},
 {"t":"Colosseum 1: Purpose (Propaganda & Entertainment)","g":"Roman Art","a":["Seated 55,000 spectators via 80 arched entrances for free gladiator & animal fights to boost the Emperor's popularity."],"p":"Give the exam point.","img":"colosseum"},
 {"t":"Colosseum 2: Social Hierarchy","g":"Roman Art","a":["Important citizens sat at the bottom; women and lower classes sat at the top."],"p":"Give the exam point.","img":"colosseum"},
 {"t":"Colosseum 3: Underground Cages","g":"Roman Art","a":["Traps and pulley hoists under the floor lifted wild animals into the arena."],"p":"Give the exam point.","img":"colosseum"},
@@ -335,10 +358,11 @@ const CARDS = [{"t":"Greek art: Humanism","g":"Greek Art","a":["Man is the measu
 {"t":"3.2 Byzantine (Medieval period)","g":"Medieval Art","a":["Complete flatness—stiff frontal figures, staring eyes, floating V-feet, solid gold backgrounds, wooden Icons, and huge central domes.","Complete flatness—stiff frontal figures, staring eyes, floating V-feet, solid gold backgrounds, wooden Icons (Vladimir Madonna), and huge central domes (Hagia Sophia, Constantinople)."],"show":"Complete flatness—stiff frontal figures, staring eyes, floating V-feet, solid gold backgrounds, wooden Icons (Vladimir Madonna), and huge central domes (Hagia Sophia, Constantinople).","p":"Describe it in one sentence."},
 {"t":"3.3 Romanesque (Medieval period)","g":"Medieval Art","a":["\"Roman-like\" heavy stone churches—round arches, heavy barrel vaults, thick dark walls, cruciform piers, and flat illuminated manuscripts on vellum.","\"Roman-like\" heavy stone churches (St. Sernin, Toulouse)—round arches, heavy barrel vaults, thick dark walls, cruciform piers, and flat illuminated manuscripts on vellum (Book of Kells)."],"show":"\"Roman-like\" heavy stone churches (St. Sernin, Toulouse)—round arches, heavy barrel vaults, thick dark walls, cruciform piers, and flat illuminated manuscripts on vellum (Book of Kells).","p":"Describe it in one sentence."},
 {"t":"3.4 Gothic (Medieval period)","g":"Medieval Art","a":["Soaring height & light—pointed arches, ribbed vaults, external flying buttresses, huge stained-glass Rose Windows, and more 3D portal jamb statues.","Soaring height & light (Notre Dame, Paris)—pointed arches, ribbed vaults, external flying buttresses, huge stained-glass Rose Windows, and more 3D portal jamb statues."],"show":"Soaring height & light (Notre Dame, Paris)—pointed arches, ribbed vaults, external flying buttresses, huge stained-glass Rose Windows, and more 3D portal jamb statues.","p":"Describe it in one sentence."},
-{"t":"Byzantine 2D mosaic (the emperor and his court)","g":"Medieval Art","a":["Mosaic of Justinian and Retinue"],"p":"Name this artwork.","img":"justinian"},
-{"t":"Mosaic of Justinian and Retinue: artist","g":"Medieval Art","a":["Anonymous"],"p":"Who is the artist?","img":"justinian"},
-{"t":"Mosaic of Justinian and Retinue: location","g":"Medieval Art","a":["Church of San Vitale, Ravenna, Italy"],"p":"Where is it?","img":"justinian"},
-{"t":"Mosaic of Justinian and Retinue: medium","g":"Medieval Art","a":["Glass and gold-leaf tesserae mosaic"],"p":"What is it made of / what medium?","img":"justinian"},
+{"t":"Name this artwork (7/12)","g":"Medieval Art","p":"Fill in every box.","img":"justinian","sum":"Mosaic of Justinian and Retinue","fields":[{"k":"Name","a":["Mosaic of Justinian and Retinue"]},
+{"k":"Artist","a":["Anonymous"]},
+{"k":"Location","a":["Church of San Vitale, Ravenna, Italy"]},
+{"k":"Medium","a":["Glass and gold-leaf tesserae mosaic"]},
+{"k":"Period","a":["Byzantine","Byzantine Medieval","Medieval"]}]},
 {"t":"Justinian mosaic 1: Strict Frontality & Staring Eyes","g":"Medieval Art","a":["Figures face straight forward with long narrow faces, staring almond eyes, and zero emotion."],"p":"Give the exam point.","img":"justinian"},
 {"t":"Justinian mosaic 2: Flat 2D Linear Drapery","g":"Medieval Art","a":["Stiff vertical lines hide the body—no 3D shading and no body felt underneath.","Stiff vertical lines hide the body—no 3D shading (chiaroscuro) and no body felt underneath."],"show":"Stiff vertical lines hide the body—no 3D shading (chiaroscuro) and no body felt underneath.","p":"Give the exam point.","img":"justinian"},
 {"t":"Justinian mosaic 3: Weightless Hovering Feet","g":"Medieval Art","a":["Pointed V-shaped feet overlap and float off the ground."],"p":"Give the exam point.","img":"justinian"},
@@ -377,35 +401,39 @@ const CARDS = [{"t":"Greek art: Humanism","g":"Greek Art","a":["Man is the measu
 {"t":"Medieval to Renaissance shift: 3D bodies","g":"Renaissance","a":["Rounded 3D bodies with weight, anatomy, contrapposto, profile/back views"],"p":"Flat, frontal, weightless becomes..."},
 {"t":"Medieval to Renaissance shift: emotion","g":"Renaissance","a":["Real human emotion, weeping & empathy"],"p":"Stoic/emotionless becomes..."},
 {"t":"High Renaissance rule","g":"Renaissance","a":["Extreme naturalism -> nothing looks Medieval anymore (gold disc halos vanish!)."],"p":"Complete it."},
-{"t":"Proto-Renaissance fresco (mourning)","g":"Renaissance","a":["The Lamentation","Lamentation"],"p":"Name this artwork.","img":"lament"},
-{"t":"The Lamentation: artist","g":"Renaissance","a":["Giotto di Bondone","Giotto di Bondone (Giotto)"],"show":"Giotto di Bondone (Giotto)","p":"Who is the artist?","img":"lament"},
-{"t":"The Lamentation: location","g":"Renaissance","a":["Scrovegni Chapel, Padua, Italy","Scrovegni (Arena) Chapel, Padua, Italy"],"show":"Scrovegni (Arena) Chapel, Padua, Italy","p":"Where is it?","img":"lament"},
-{"t":"The Lamentation: medium","g":"Renaissance","a":["Fresco","Fresco (wet plaster)"],"show":"Fresco (wet plaster)","p":"What is it made of / what medium?","img":"lament"},
+{"t":"Name this artwork (8/12)","g":"Renaissance","p":"Fill in every box.","img":"lament","sum":"The Lamentation","fields":[{"k":"Name","a":["The Lamentation","Lamentation"]},
+{"k":"Artist","a":["Giotto di Bondone","Giotto di Bondone (Giotto)"],"show":"Giotto di Bondone (Giotto)"},
+{"k":"Location","a":["Scrovegni Chapel, Padua, Italy","Scrovegni (Arena) Chapel, Padua, Italy"],"show":"Scrovegni (Arena) Chapel, Padua, Italy"},
+{"k":"Medium","a":["Fresco","Fresco (wet plaster)"],"show":"Fresco (wet plaster)"},
+{"k":"Period","a":["Proto-Renaissance","Proto Renaissance"]}]},
 {"t":"The Lamentation: subject","g":"Renaissance","a":["Mary holds and mourns the dead body of Jesus after the crucifixion, surrounded by weeping friends and angels."],"p":"What does it show?","img":"lament"},
 {"t":"The Lamentation 1: Still Medieval","g":"Renaissance","a":["Figures still wear flat gold disc halos.","Figures still wear flat gold disc halos (like yellow hats)."],"show":"Figures still wear flat gold disc halos (like yellow hats).","p":"Give the exam point.","img":"lament"},
 {"t":"The Lamentation 2: Raw Emotion & Backs Turned","g":"Renaissance","a":["Weeping faces, John flinging his arms back in grief, and two foreground figures sitting with their backs turned to frame Christ."],"p":"Give the exam point.","img":"lament"},
 {"t":"The Lamentation 3: 3D Chiaroscuro Weight","g":"Renaissance","a":["Light/dark modelling gives the cloaks rounded 3D mass and weight on the ground.","Light/dark modelling gives the cloaks rounded 3D mass and weight on the ground (knee pressing through cloth)."],"show":"Light/dark modelling gives the cloaks rounded 3D mass and weight on the ground (knee pressing through cloth).","p":"Give the exam point.","img":"lament"},
 {"t":"The Lamentation 4: Depth & Blue Sky","g":"Renaissance","a":["Overlapping figures, a steep diagonal rock pointing straight down to Mary & Jesus, and a blue sky instead of gold."],"p":"Give the exam point.","img":"lament"},
-{"t":"Early Renaissance tempera painting (goddess and sea)","g":"Renaissance","a":["The Birth of Venus","Birth of Venus"],"p":"Name this artwork.","img":"venus"},
-{"t":"The Birth of Venus: artist","g":"Renaissance","a":["Sandro Botticelli"],"p":"Who is the artist?","img":"venus"},
-{"t":"The Birth of Venus: location","g":"Renaissance","a":["Florence, Italy","Florence, Italy (Uffizi Gallery)"],"show":"Florence, Italy (Uffizi Gallery)","p":"Where is it?","img":"venus"},
-{"t":"The Birth of Venus: medium","g":"Renaissance","a":["Tempera on canvas","Tempera on canvas (matte colours)"],"show":"Tempera on canvas (matte colours)","p":"What is it made of / what medium?","img":"venus"},
+{"t":"Name this artwork (9/12)","g":"Renaissance","p":"Fill in every box.","img":"venus","sum":"The Birth of Venus","fields":[{"k":"Name","a":["The Birth of Venus","Birth of Venus"]},
+{"k":"Artist","a":["Sandro Botticelli"]},
+{"k":"Location","a":["Florence, Italy","Florence, Italy (Uffizi Gallery)"],"show":"Florence, Italy (Uffizi Gallery)"},
+{"k":"Medium","a":["Tempera on canvas","Tempera on canvas (matte colours)"],"show":"Tempera on canvas (matte colours)"},
+{"k":"Period","a":["Early Renaissance","Early Renaissance In-Between"]}]},
 {"t":"The Birth of Venus: subject","g":"Renaissance","a":["Classical mythology: Venus born on a sea shell, blown to shore by Zephyr & Chloris while Pomona holds a cloak.","Classical mythology: Venus (goddess of love) born on a sea shell, blown to shore by Zephyr & Chloris (left) while Pomona holds a cloak (right)."],"show":"Classical mythology: Venus (goddess of love) born on a sea shell, blown to shore by Zephyr & Chloris (left) while Pomona holds a cloak (right).","p":"What does it show?","img":"venus"},
 {"t":"The Birth of Venus 1: Classical & Naturalistic","g":"Renaissance","a":["First life-size naked woman since Greece/Rome, standing in contrapposto with 3D shading and porcelain flesh tones."],"p":"Give the exam point.","img":"venus"},
 {"t":"The Birth of Venus 2: Still Stylized (\"In-Between\")","g":"Renaissance","a":["Flat V-shaped waves, decorative flowers, and visible wind lines drawn blowing from Zephyr's mouth."],"p":"Give the exam point.","img":"venus"},
 {"t":"Madonna comparison: Leonardo's Virgin of the Rocks or Lippi's Madonna","g":"Renaissance","a":["Real young mother, chubby human baby Jesus, 3D chiaroscuro triangle, and distant atmospheric perspective landscape"],"p":"What do you see (vs the flat gold-background Byzantine Icon)?"},
-{"t":"High Renaissance fresco (Jesus and the 12)","g":"Renaissance","a":["The Last Supper","Last Supper"],"p":"Name this artwork.","img":"supper"},
-{"t":"The Last Supper: artist","g":"Renaissance","a":["Leonardo da Vinci"],"p":"Who is the artist?","img":"supper"},
-{"t":"The Last Supper: location","g":"Renaissance","a":["Monastery of Santa Maria delle Grazie, Milan, Italy"],"p":"Where is it?","img":"supper"},
-{"t":"The Last Supper: medium","g":"Renaissance","a":["Fresco","Fresco (oil/tempera on plaster; uses Naples yellow, smalt blue, carmine lake)"],"show":"Fresco (oil/tempera on plaster; uses Naples yellow, smalt blue, carmine lake)","p":"What is it made of / what medium?","img":"supper"},
+{"t":"Name this artwork (10/12)","g":"Renaissance","p":"Fill in every box.","img":"supper","sum":"The Last Supper","fields":[{"k":"Name","a":["The Last Supper","Last Supper"]},
+{"k":"Artist","a":["Leonardo da Vinci"]},
+{"k":"Location","a":["Monastery of Santa Maria delle Grazie, Milan, Italy"]},
+{"k":"Medium","a":["Fresco","Fresco (oil/tempera on plaster; uses Naples yellow, smalt blue, carmine lake)"],"show":"Fresco (oil/tempera on plaster; uses Naples yellow, smalt blue, carmine lake)"},
+{"k":"Period","a":["High Renaissance"]}]},
 {"t":"The Last Supper: subject","g":"Renaissance","a":["Jesus sits at the centre of the table and announces that one of His 12 apostles will betray Him."],"p":"What does it show?","img":"supper"},
 {"t":"The Last Supper 1: One-Point Linear Perspective & Focal Point","g":"Renaissance","a":["All diagonal ceiling/wall perspective lines meet at the vanishing point directly behind Christ's head = deep 3D room + Christ is the focal point.","All diagonal ceiling/wall perspective lines meet at the vanishing point directly behind Christ's head (framed by the window) = deep 3D room + Christ is the focal point."],"show":"All diagonal ceiling/wall perspective lines meet at the vanishing point directly behind Christ's head (framed by the window) = deep 3D room + Christ is the focal point.","p":"Give the exam point.","img":"supper"},
 {"t":"The Last Supper 2: Grouping in 3s & Emotion","g":"Renaissance","a":["Calm triangular Christ in the centre; 12 apostles in 4 groups of 3 reacting with shock.","Calm triangular Christ in the centre; 12 apostles in 4 groups of 3 reacting with shock (Judas in shadow clutching silver; two quiet end figures bracket the frame)."],"show":"Calm triangular Christ in the centre; 12 apostles in 4 groups of 3 reacting with shock (Judas in shadow clutching silver; two quiet end figures bracket the frame).","p":"Give the exam point.","img":"supper"},
 {"t":"The Last Supper 3: Sfumato & Chiaroscuro","g":"Renaissance","a":["Smoky blurred outlines and 3D light/dark modelling."],"p":"Give the exam point.","img":"supper"},
-{"t":"High Renaissance drawing (your own work)","g":"Renaissance","a":["The Vitruvian Man","Vitruvian Man"],"p":"Name this artwork.","img":"vitruvian"},
-{"t":"The Vitruvian Man: artist","g":"Renaissance","a":["Leonardo da Vinci"],"p":"Who is the artist?","img":"vitruvian"},
-{"t":"The Vitruvian Man: location","g":"Renaissance","a":["Milan / Venice, Italy"],"p":"Where is it?","img":"vitruvian"},
-{"t":"The Vitruvian Man: medium","g":"Renaissance","a":["Pen and ink with watercolour wash on paper","Pen and ink with watercolour wash on paper (with mirror-writing notes)"],"show":"Pen and ink with watercolour wash on paper (with mirror-writing notes)","p":"What is it made of / what medium?","img":"vitruvian"},
+{"t":"Name this artwork (11/12)","g":"Renaissance","p":"Fill in every box.","img":"vitruvian","sum":"The Vitruvian Man","fields":[{"k":"Name","a":["The Vitruvian Man","Vitruvian Man"]},
+{"k":"Artist","a":["Leonardo da Vinci"]},
+{"k":"Location","a":["Milan / Venice, Italy"]},
+{"k":"Medium","a":["Pen and ink with watercolour wash on paper","Pen and ink with watercolour wash on paper (with mirror-writing notes)"],"show":"Pen and ink with watercolour wash on paper (with mirror-writing notes)"},
+{"k":"Period","a":["High Renaissance"]}]},
 {"t":"The Vitruvian Man: subject","g":"Renaissance","a":["Nude man in 2 overlapping positions inside a Square and a Circle.","Nude man in 2 overlapping positions inside a Square and a Circle (based on Roman architect Vitruvius)."],"show":"Nude man in 2 overlapping positions inside a Square and a Circle (based on Roman architect Vitruvius).","p":"What does it show?","img":"vitruvian"},
 {"t":"The Vitruvian Man 1: Square (Physical Earth)","g":"Renaissance","a":["Legs together, arms straight out -> arm span = height.","Legs together, arms straight out -> arm span = height (centre = groin)."],"show":"Legs together, arms straight out -> arm span = height (centre = groin).","p":"Give the exam point.","img":"vitruvian"},
 {"t":"The Vitruvian Man 2: Circle (Spiritual Universe)","g":"Renaissance","a":["Legs spread, arms raised -> hands & feet touch circle.","Legs spread, arms raised -> hands & feet touch circle (centre = navel / belly button)."],"show":"Legs spread, arms raised -> hands & feet touch circle (centre = navel / belly button).","p":"Give the exam point.","img":"vitruvian"},
@@ -413,9 +441,11 @@ const CARDS = [{"t":"Greek art: Humanism","g":"Greek Art","a":["Man is the measu
 {"t":"The Vitruvian Man 3: Proportions, Head","g":"Renaissance","a":["1/8 of height"],"p":"What fraction of height?","img":"vitruvian"},
 {"t":"The Vitruvian Man 3: Proportions, Face","g":"Renaissance","a":["1/10"],"p":"What fraction of height?","img":"vitruvian"},
 {"t":"The Vitruvian Man 3: Proportions, Cubit (elbow to fingertip)","g":"Renaissance","a":["1/4"],"p":"What fraction of height?","img":"vitruvian"},
-{"t":"High Renaissance altar-wall fresco (hundreds of twisting figures)","g":"Renaissance","a":["The Last Judgment","Last Judgment","The Last Judgement","Last Judgement"],"p":"Name this artwork.","img":"judgment"},
-{"t":"The Last Judgment: artist","g":"Renaissance","a":["Michelangelo"],"p":"Who is the artist?","img":"judgment"},
-{"t":"The Last Judgment: location","g":"Renaissance","a":["Sistine Chapel, Rome"],"p":"Where is it?","img":"judgment"},
+{"t":"Name this artwork (12/12)","g":"Renaissance","p":"Fill in every box.","img":"judgment","sum":"The Last Judgment","fields":[{"k":"Name","a":["The Last Judgment","Last Judgment","The Last Judgement","Last Judgement"]},
+{"k":"Artist","a":["Michelangelo"]},
+{"k":"Location","a":["Sistine Chapel, Rome"]},
+{"k":"Medium","a":["Fresco"]},
+{"k":"Period","a":["High Renaissance"]}]},
 {"t":"Byzantine: Justinian & Retinue (San Vitale, Ravenna): Artist & Medium","g":"15-Mark Table","a":["Anonymous; glass & gold mosaic."],"p":"15-mark comparison. Give the point.","img":"justinian"},
 {"t":"Proto-Renaissance: Giotto, The Lamentation (Padua): Artist & Medium","g":"15-Mark Table","a":["Giotto; wall fresco."],"p":"15-mark comparison. Give the point.","img":"lament"},
 {"t":"High Renaissance: Michelangelo, The Last Judgment (Sistine Chapel, Rome): Artist & Medium","g":"15-Mark Table","a":["Michelangelo; altar wall fresco."],"p":"15-mark comparison. Give the point.","img":"judgment"},
@@ -430,7 +460,7 @@ const CARDS = [{"t":"Greek art: Humanism","g":"Greek Art","a":["Man is the measu
 {"t":"High Renaissance: Michelangelo, The Last Judgment (Sistine Chapel, Rome): Space & Background","g":"15-Mark Table","a":["Deep blue sky; 3D layering via foreshortening."],"p":"15-mark comparison. Give the point.","img":"judgment"},
 {"t":"Byzantine: Justinian & Retinue (San Vitale, Ravenna): Halos & Humanism","g":"15-Mark Table","a":["Flat gold halo on Emperor."],"p":"15-mark comparison. Give the point.","img":"justinian"},
 {"t":"Proto-Renaissance: Giotto, The Lamentation (Padua): Halos & Humanism","g":"15-Mark Table","a":["Still keeps flat gold disc halos (yellow hats = link to Medieval!)."],"p":"15-mark comparison. Give the point.","img":"lament"},
-{"t":"High Renaissance: Michelangelo, The Last Judgment (Sistine Chapel, Rome): Halos & Humanism","g":"15-Mark Table","a":["No gold disc halos! Replaced by a natural burst of yellow light behind Christ (Humanism)."],"p":"15-mark comparison. Give the point.","img":"judgment"}];
+{"t":"High Renaissance: Michelangelo, The Last Judgment (Sistine Chapel, Rome): Halos & Humanism","g":"15-Mark Table","a":["No gold disc halos! Replaced by a natural burst of yellow light behind Christ (Humanism).","Nothing"],"p":"15-mark comparison. Give the point.","img":"judgment"}];
 const THEME = {"fonts": {"url": "https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=EB+Garamond:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap", "body": "'EB Garamond'", "display": "'Cinzel'"}, "colors": {"bg": "#120d09", "panel": "#1d1610", "panel2": "#271d14", "line": "#4a3826", "text": "#f1e6d0", "muted": "#a8977c", "accent": "#e0b252", "accent2": "#c9593d", "glow1": "#3a2410", "glow2": "#3b1a14", "good": "#8fd18a", "close": "#f0c75e", "bad": "#ef7a6a"}, "bg": {"kind": "falling", "colors": ["#e0b252", "#c9593d", "#f1e6d0"], "count": 70}, "confetti": ["#e0b252", "#c9593d", "#f1e6d0", "#8fd18a", "#ffffff"]};
 
 (function applyTheme(){
@@ -495,17 +525,22 @@ function show(){
   setPics(c);
   $("topic").textContent=c.g||""; $("topic").classList.toggle("hidden",!c.g); $("term").textContent=c.t; $("termBack").textContent=c.t; $("term").style.fontSize=c.t.length>70?"1.45rem":c.t.length>35?"1.9rem":""; $("termBack").style.fontSize=c.t.length>70?"1.05rem":""; $("promptText").textContent=c.p||CONFIG.prompt||"";
   input.value=""; input.disabled=false;
+  const multi=!!c.fields;
+  $("inputBox").classList.toggle("hidden",multi); $("fields").classList.toggle("hidden",!multi);
+  $("singleBack").classList.toggle("hidden",multi); $("multiBack").classList.toggle("hidden",!multi);
+  if(multi) $("fields").innerHTML=c.fields.map((f,i)=>`<label class="fld"><span>${esc(f.k)}</span><input class="fin" type="text" autocomplete="off" spellcheck="false" data-i="${i}"></label>`).join("");
   toggle(["checkBtn","skipBtn","hintBtn"],true); usedHint=false; $("hintline").classList.add("hidden"); $("hintline").innerHTML=""; toggle(["nextBtn","overrideBtn"],false);
-  $("hint").innerHTML='<kbd>Enter</kbd> check · <kbd>Shift</kbd>+<kbd>Enter</kbd> new line · <kbd>Alt</kbd>+<kbd>H</kbd> hint';
+  $("hint").innerHTML=multi?'<kbd>Enter</kbd> next box (check on the last) · <kbd>Alt</kbd>+<kbd>H</kbd> hint':'<kbd>Enter</kbd> check · <kbd>Shift</kbd>+<kbd>Enter</kbd> new line · <kbd>Alt</kbd>+<kbd>H</kbd> hint';
   void card.offsetWidth; card.classList.add("enter");
   setTimeout(()=>card.classList.remove("enter"),600);
-  setTimeout(()=>input.focus(),50);
+  setTimeout(()=>(multi?document.querySelector('.fin'):input).focus(),50);
   updateStats();
 }
 function toggle(ids,on){ids.forEach(id=>$(id).classList.toggle("hidden",!on))}
 
 function check(skip=false){
   if(phase!=="ask")return;
+  if(deck[idx].fields) return checkMulti(skip);
   const c=deck[idx], typed=skip?"":input.value.trim();
   if(!skip && !typed){card.classList.add("shake");setTimeout(()=>card.classList.remove("shake"),500);return}
   phase="shown";
@@ -551,6 +586,39 @@ function check(skip=false){
   else { mark(false); setTimeout(()=>{card.classList.add("shake");setTimeout(()=>card.classList.remove("shake"),500)},800); }
   setTimeout(()=>$("nextBtn").focus(),100);
 }
+// multi-box card: every field is scored on its own; the card counts as correct only if every box is
+function checkMulti(skip){
+  const c=deck[idx], ins=[...document.querySelectorAll("#fields .fin")];
+  const typed=ins.map(i=>skip?"":i.value.trim());
+  if(!skip && typed.every(t=>!t)){card.classList.add("shake");setTimeout(()=>card.classList.remove("shake"),500);return}
+  phase="shown";
+  const res=c.fields.map((f,i)=>{let best=null; f.a.forEach(ans=>{const r=compare(ans,typed[i]); if(!best||r.score>best.score)best=r}); return best});
+  const scores=res.map(r=>r.score), avg=Math.round(scores.reduce((a,b)=>a+b,0)/scores.length);
+  const bad=scores.filter(s=>s<90).length, level=bad===0?"good":avg>=65?"close":"bad";
+  const col={good:"var(--good)",close:"var(--close)",bad:"var(--bad)"}[level];
+  $("multiBack").innerHTML=c.fields.map((f,i)=>{
+    const r=res[i], s=scores[i], lv=s>=90?"good":s>=65?"close":"bad";
+    const ws=r.A.map((w,j)=>`<span class="w ${SOFT.has(w.n)?"soft":r.hitA.has(j)?"hit":"miss"}" style="animation-delay:${.3+i*.1+j*.03}s">${esc(w.raw)}</span>`).join("");
+    const yo=typed[i]?r.T.map((w,j)=>SOFT.has(w.n)||r.hitT.has(j)?esc(w.raw):`<span class="extra">${esc(w.raw)}</span>`).join(" "):"<em style='color:var(--muted)'>(blank)</em>";
+    return `<div class="frow ${lv}"><div class="fhead"><span class="label">${esc(f.k)}</span><b class="fscore" style="color:var(--${lv==="bad"?"bad":lv})">${s}%</b></div><div class="answer">${ws}</div><div class="yours small">${yo}</div>${f.show?`<div class="alt">Full: ${esc(f.show)}</div>`:""}</div>`;
+  }).join("");
+  const ring=$("ring"); ring.style.setProperty("--c",col); ring.style.setProperty("--p",0);
+  $("pct").textContent="0%";
+  requestAnimationFrame(()=>requestAnimationFrame(()=>ring.style.setProperty("--p",avg)));
+  countUp($("pct"),avg);
+  const titles={good:["Spot on!","Every box right.","Nailed it."],close:["Almost there","So close","Nearly"],bad:["Not yet","Keep at it","Learn this one"]};
+  $("vTitle").textContent=skip?"Here it is":pick(titles[level]); $("vTitle").style.color=col;
+  $("vSub").textContent=skip?"Have a read, it'll come back later.":bad===0?"All boxes correct.":`${bad} of ${scores.length} boxes need work.`;
+  if(usedHint && !skip) $("vSub").textContent+=" (used a hint)";
+  card.classList.add("flipped");
+  ins.forEach(i=>i.disabled=true);
+  toggle(["checkBtn","skipBtn","hintBtn"],false); toggle(["nextBtn"],true);
+  toggle(["overrideBtn"], level!=="good" && !skip);
+  $("hint").innerHTML='<kbd>Enter</kbd> next card';
+  if(level==="good"){ mark(true); setTimeout(()=>burst(),450); }
+  else { mark(false); setTimeout(()=>{card.classList.add("shake");setTimeout(()=>card.classList.remove("shake"),500)},800); }
+  setTimeout(()=>$("nextBtn").focus(),100);
+}
 let lastCorrect=null;
 function mark(ok){
   lastCorrect=ok;
@@ -579,7 +647,7 @@ function finish(){
     <h2>${pct===100?"Perfect round!":pct>=75?"Great round":"Round done"}</h2>
     <div class="big">${right}/${deck.length}</div>
     ${missed.length?`<p style="color:var(--muted);margin-top:10px">Still to learn:</p>
-      <div class="missed">${missed.map(c=>`<span>${esc(c.t)}</span>`).join("")}</div>`:"<p style='color:var(--muted);margin:10px 0 22px'>You got every one.</p>"}
+      <div class="missed">${missed.map(c=>`<span>${esc(c.sum||c.t)}</span>`).join("")}</div>`:"<p style='color:var(--muted);margin:10px 0 22px'>You got every one.</p>"}
     <div class="row" style="justify-content:center">
       ${missed.length?`<button class="btn primary" id="redoMissed">Redo the ${missed.length} I missed</button>`:""}
       <button class="btn ghost" id="redoAll">Start over</button>
@@ -598,15 +666,15 @@ let usedHint=false;
 function showHint(){
   if(phase!=="ask"||usedHint)return;
   usedHint=true;
-  const ans=deck[idx].a[0];
-  $("hintline").innerHTML = ans.split(/\s+/).map((w,i)=>{
+  const c=deck[idx], srcs=c.fields?c.fields.map(f=>[f.k,f.a[0]]):[[null,c.a[0]]];
+  $("hintline").innerHTML = srcs.map(([k,ans])=>(k?`<div><b>${esc(k)}:</b> `:"<div>")+ans.split(/\s+/).map((w,i)=>{
     const m=w.match(/^([A-Za-z0-9])(.*?)([.,;:]?)$/);
     const body = m ? esc(m[1])+"<i>"+m[2].replace(/[A-Za-z0-9]/g,"_")+"</i>"+esc(m[3]) : esc(w);
     return `<span class="w" style="animation-delay:${i*.05}s">${body}</span>`;
-  }).join("");
+  }).join("")+"</div>").join("");
   $("hintline").classList.remove("hidden");
   toggle(["hintBtn"],false);
-  input.focus();
+  (deck[idx].fields?document.querySelector(".fin"):input).focus();
 }
 // ---------- events ----------
 $("hintBtn").onclick=showHint;
@@ -616,6 +684,11 @@ $("skipBtn").onclick=()=>check(true);
 $("nextBtn").onclick=next;
 $("overrideBtn").onclick=override;
 input.addEventListener("keydown",e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();e.stopPropagation();check()}});
+$("fields").addEventListener("keydown",e=>{
+  if(e.key!=="Enter")return; e.preventDefault(); e.stopPropagation();
+  const ins=[...$("fields").querySelectorAll(".fin")], i=ins.indexOf(e.target);
+  if(i<0||i===ins.length-1) check(); else ins[i+1].focus();
+});
 document.addEventListener("keydown",e=>{if(e.key==="Enter"&&phase==="shown"&&document.activeElement!==$("overrideBtn")){e.preventDefault();next()}});
 // picture zoom: click an artwork/diagram to enlarge, click again or press Esc to close
 function openLb(src){ $("lbImg").src=src; $("lb").classList.remove("hidden"); }
