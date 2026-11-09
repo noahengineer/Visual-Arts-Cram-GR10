@@ -1,0 +1,712 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Flashcards</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#070b14; --panel:#0f1626; --panel2:#141d31; --line:#22304d;
+    --text:#e7ecf7; --muted:#8a97b3; --accent:#5ee1ff; --accent2:#a78bfa;
+    --good:#4ade80; --close:#facc15; --bad:#f87171;
+  --glow1:#14204a; --glow2:#2a1650; --font:'Space Grotesk'; --display:'Space Grotesk';
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{
+    font-family:var(--font),system-ui,sans-serif;color:var(--text);
+    background:radial-gradient(1200px 700px at 20% -10%,var(--glow1) 0%,transparent 60%),
+               radial-gradient(900px 600px at 110% 110%,var(--glow2) 0%,transparent 55%),var(--bg);
+    min-height:100vh;overflow-x:hidden;
+  }
+  canvas#bg{position:fixed;inset:0;z-index:0;pointer-events:none}
+  canvas#fx{position:fixed;inset:0;z-index:50;pointer-events:none}
+  .wrap{position:relative;z-index:1;max-width:760px;margin:0 auto;padding:28px 18px 60px}
+
+  header{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:22px}
+  h1{font-size:1.35rem;font-weight:700;letter-spacing:-.01em}
+  h1 span{color:var(--accent)}
+  .sub{color:var(--muted);font-size:.85rem;margin-top:2px}
+  .stats{display:flex;gap:10px}
+  .stat{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:8px 12px;text-align:center;min-width:64px}
+  .stat b{display:block;font-family:'JetBrains Mono',monospace;font-size:1.1rem}
+  .stat small{color:var(--muted);font-size:.7rem;text-transform:uppercase;letter-spacing:.08em}
+  .stat.streak b{color:var(--close)}
+  .stat.bump{animation:bump .4s ease}
+  @keyframes bump{40%{transform:scale(1.18)}}
+
+  .chips{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px}
+  .chip{background:var(--panel);border:1px solid var(--line);color:var(--muted);padding:7px 14px;border-radius:999px;
+        font:inherit;font-size:.85rem;cursor:pointer;transition:.2s;-webkit-user-select:none;user-select:none}
+  .chip:hover{color:var(--text);border-color:#3a4c75}
+  .chip.on{background:linear-gradient(135deg,color-mix(in srgb,var(--accent) 25%,var(--panel)),color-mix(in srgb,var(--accent2) 25%,var(--panel)));color:var(--text);border-color:var(--accent)}
+
+  .progress{height:6px;background:var(--panel);border-radius:99px;overflow:hidden;margin-bottom:22px;border:1px solid var(--line)}
+  .progress i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--accent),var(--accent2));
+              transition:width .6s cubic-bezier(.2,.8,.2,1);box-shadow:0 0 12px var(--accent)}
+
+  /* card */
+  .scene{perspective:1400px;margin-bottom:18px}
+  .card{position:relative;display:grid;width:100%;min-height:260px;transform-style:preserve-3d;
+        transition:transform .8s cubic-bezier(.3,1.4,.4,1)}
+  .card.flipped{transform:rotateY(180deg)}
+  .card.enter{animation:enter .55s cubic-bezier(.2,.9,.3,1.2)}
+  @keyframes enter{from{opacity:0;transform:translateY(40px) rotateX(-25deg) scale(.92)}to{opacity:1;transform:none}}
+  .card.leave{animation:leave .35s ease-in forwards}
+  .card.flipped.leave{animation:leaveF .35s ease-in forwards}
+  @keyframes leave{to{opacity:0;transform:translateX(-120px) rotate(-8deg)}}
+  @keyframes leaveF{to{opacity:0;transform:rotateY(180deg) translateX(120px) rotate(8deg)}}
+  .face{grid-area:1/1;position:relative;backface-visibility:hidden;-webkit-backface-visibility:hidden;border-radius:22px;
+        padding:30px;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;
+        background:linear-gradient(160deg,var(--panel2),var(--panel));border:1px solid var(--line);
+        box-shadow:0 30px 60px -20px #000a,inset 0 1px 0 #ffffff10;overflow:hidden}
+  .face::before{content:"";position:absolute;inset:-1px;border-radius:22px;padding:1px;
+        background:conic-gradient(from var(--ang,0deg),transparent 0 70%,var(--accent) 80%,var(--accent2) 90%,transparent);
+        -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude;
+        animation:spin 6s linear infinite;opacity:.7}
+  @property --ang{syntax:'<angle>';inherits:false;initial-value:0deg}
+  @keyframes spin{to{--ang:360deg}}
+  .back{transform:rotateY(180deg);justify-content:flex-start;align-items:stretch;text-align:left}
+  .tag{font-family:'JetBrains Mono',monospace;font-size:.72rem;letter-spacing:.14em;text-transform:uppercase;color:var(--accent);
+       background:color-mix(in srgb,var(--accent) 8%,transparent);border:1px solid color-mix(in srgb,var(--accent) 20%,transparent);padding:4px 10px;border-radius:99px;margin-bottom:18px}
+  .term{font-family:var(--display),system-ui,serif;font-size:clamp(2rem,6vw,3.1rem);font-weight:700;letter-spacing:-.02em;line-height:1.05;
+        background:linear-gradient(120deg,#fff 30%,var(--accent) 70%,var(--accent2));-webkit-background-clip:text;background-clip:text;color:transparent}
+  .prompt{color:var(--muted);margin-top:14px;font-size:.95rem}
+  .hintline{margin-top:18px;font-family:'JetBrains Mono',monospace;font-size:1rem;color:var(--close);line-height:1.7;max-width:560px}
+  .hintline .w{display:inline-block;margin-right:.55em;opacity:0;transform:translateY(-8px) scale(.8);animation:pop .3s forwards}
+  .hintline .w i{font-style:normal;color:#facc1555;letter-spacing:.08em}
+  .card.shake{animation:shake .5s}
+  .card.flipped.shake{animation:shakeF .5s}
+  @keyframes shake{20%,60%{transform:translateX(-10px)}40%,80%{transform:translateX(10px)}}
+  @keyframes shakeF{20%,60%{transform:rotateY(180deg) translateX(-10px)}40%,80%{transform:rotateY(180deg) translateX(10px)}}
+
+  /* artwork / diagram image on a card */
+  .pic{display:block;max-width:100%;max-height:250px;width:auto;height:auto;object-fit:contain;margin:0 auto 16px;border-radius:12px;
+       border:1px solid var(--line);background:#00000040;box-shadow:0 14px 34px -12px #000;cursor:zoom-in;
+       animation:picIn .7s cubic-bezier(.2,.9,.3,1.1) both}
+  .pic.small{max-height:130px;margin:0 0 12px;align-self:flex-start}
+  @keyframes picIn{from{opacity:0;transform:scale(.9) translateY(14px);filter:blur(6px)}to{opacity:1;transform:none;filter:none}}
+  .zoomhint{font-size:.68rem;color:var(--muted);margin:-8px 0 12px;letter-spacing:.06em}
+  #lb{position:fixed;inset:0;z-index:100;background:#000d;display:flex;align-items:center;justify-content:center;padding:16px;cursor:zoom-out;animation:enter .3s}
+  #lb img{max-width:100%;max-height:100%;border-radius:10px;box-shadow:0 20px 80px #000}
+
+  .qline{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid var(--line)}
+  .qline .label{margin:0}
+  .qline b{font-family:var(--display),system-ui,serif;font-size:1.35rem;font-weight:700;letter-spacing:-.01em;background:linear-gradient(120deg,#fff 30%,var(--accent) 70%,var(--accent2));-webkit-background-clip:text;background-clip:text;color:transparent}
+  .verdict{display:flex;align-items:center;gap:12px;margin-bottom:14px}
+  .ring{--p:0;--c:var(--good);width:58px;height:58px;border-radius:50%;flex:none;
+        background:conic-gradient(var(--c) calc(var(--p)*1%),#ffffff12 0);display:grid;place-items:center;
+        transition:--p 1s ease}
+  @property --p{syntax:'<number>';inherits:false;initial-value:0}
+  .ring span{width:46px;height:46px;border-radius:50%;background:var(--panel);display:grid;place-items:center;
+             font-family:'JetBrains Mono',monospace;font-size:.85rem;font-weight:600}
+  .verdict h3{font-size:1.2rem}
+  .verdict p{color:var(--muted);font-size:.82rem}
+  .label{font-size:.7rem;text-transform:uppercase;letter-spacing:.12em;color:var(--muted);margin:10px 0 6px}
+  .answer{font-size:1.08rem;line-height:1.6}
+  .answer .w{display:inline-block;opacity:0;transform:translateY(8px);animation:pop .35s forwards;margin-right:.28em}
+  .answer .hit{color:var(--good)}
+  .answer .miss{color:var(--bad);text-decoration:underline wavy #f8717180;text-underline-offset:4px}
+  .answer .soft{color:var(--muted)}
+  @keyframes pop{to{opacity:1;transform:none}}
+  .yours{font-family:'JetBrains Mono',monospace;font-size:.85rem;color:#c9d3ea;background:#00000033;border:1px solid var(--line);
+         border-radius:10px;padding:10px 12px;white-space:pre-wrap;word-break:break-word}
+  .yours .extra{color:var(--close)}
+  .alt{color:var(--muted);font-size:.82rem;margin-top:6px}
+
+  .inputbox{position:relative}
+  textarea{width:100%;min-height:96px;resize:vertical;background:var(--panel);border:1px solid var(--line);color:var(--text);
+           border-radius:16px;padding:16px 18px;font:inherit;font-size:1rem;line-height:1.5;outline:none;transition:.25s}
+  textarea:focus{border-color:var(--accent);box-shadow:0 0 0 4px color-mix(in srgb,var(--accent) 12%,transparent),0 0 30px color-mix(in srgb,var(--accent) 13%,transparent)}
+  textarea:disabled{opacity:.55}
+  .row{display:flex;gap:10px;margin-top:12px;align-items:center;flex-wrap:wrap}
+  .hint{color:var(--muted);font-size:.8rem;margin-right:auto}
+  kbd{font-family:'JetBrains Mono',monospace;font-size:.72rem;background:var(--panel2);border:1px solid var(--line);
+      border-bottom-width:2px;padding:1px 6px;border-radius:5px}
+  button.btn{font:inherit;font-weight:600;border:0;border-radius:12px;padding:11px 18px;cursor:pointer;transition:.2s}
+  .primary{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#071020}
+  .primary:hover{filter:brightness(1.1);transform:translateY(-1px);box-shadow:0 10px 24px -8px var(--accent)}
+  .ghost{background:var(--panel);color:var(--muted);border:1px solid var(--line)!important}
+  .ghost:hover{color:var(--text)}
+  .hidden{display:none!important}
+
+  .done{text-align:center;padding:40px 20px;background:linear-gradient(160deg,var(--panel2),var(--panel));
+        border:1px solid var(--line);border-radius:22px;animation:enter .6s cubic-bezier(.2,.9,.3,1.2)}
+  .done h2{font-size:2rem;margin-bottom:6px}
+  .done .big{font-family:'JetBrains Mono',monospace;font-size:3.4rem;font-weight:600;
+             background:linear-gradient(120deg,var(--accent),var(--accent2));-webkit-background-clip:text;background-clip:text;color:transparent}
+  .missed{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin:16px 0 22px}
+  .missed span{background:#f8717118;border:1px solid #f8717144;color:#fca5a5;padding:4px 10px;border-radius:99px;font-size:.82rem}
+  footer{color:var(--muted);font-size:.75rem;text-align:center;margin-top:28px}
+  @media (max-width:560px){header{flex-direction:column;align-items:flex-start}.face{padding:22px}.card{min-height:240px}.pic{max-height:200px}}
+</style>
+</head>
+<body>
+<canvas id="bg"></canvas>
+<canvas id="fx"></canvas>
+<div id="lb" class="hidden"><img id="lbImg" alt=""></div>
+
+<div class="wrap">
+  <header>
+    <div>
+      <h1 id="title"></h1>
+      <div class="sub" id="subtitle"></div>
+    </div>
+    <div class="stats">
+      <div class="stat"><b id="sDone">0/0</b><small>Card</small></div>
+      <div class="stat"><b id="sRight">0</b><small>Correct</small></div>
+      <div class="stat streak" id="streakBox"><b id="sStreak">0</b><small>Streak</small></div>
+    </div>
+  </header>
+
+  <div class="chips" id="chips">
+  </div>
+
+  <div class="progress"><i id="bar"></i></div>
+
+  <div id="game">
+    <div class="scene">
+      <div class="card" id="card">
+        <div class="face front">
+          <div class="tag" id="topic"></div>
+          <img class="pic hidden" id="pic" alt="">
+          <div class="zoomhint hidden" id="zoomHint">click the picture to enlarge</div>
+          <div class="term" id="term"></div>
+          <div class="prompt" id="promptText"></div>
+          <div class="hintline hidden" id="hintline"></div>
+        </div>
+        <div class="face back">
+          <div class="qline"><span class="label">Question</span><b id="termBack"></b></div>
+          <img class="pic small hidden" id="picBack" alt="">
+          <div class="verdict">
+            <div class="ring" id="ring"><span id="pct">0%</span></div>
+            <div><h3 id="vTitle">Nice</h3><p id="vSub"></p></div>
+          </div>
+          <div class="label">Answer</div>
+          <div class="answer" id="answer"></div>
+          <div class="alt" id="alt"></div>
+          <div class="label">You wrote</div>
+          <div class="yours" id="yours"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="inputbox">
+      <textarea id="input" placeholder="Type your answer…" autocomplete="off" spellcheck="false"></textarea>
+    </div>
+    <div class="row">
+      <div class="hint" id="hint"><kbd>Enter</kbd> check · <kbd>Shift</kbd>+<kbd>Enter</kbd> new line · <kbd>Alt</kbd>+<kbd>H</kbd> hint</div>
+      <button class="btn ghost" id="hintBtn">💡 First-letter hint</button>
+      <button class="btn ghost" id="skipBtn">I don't know</button>
+      <button class="btn ghost hidden" id="overrideBtn">Count it as correct</button>
+      <button class="btn primary" id="checkBtn">Check</button>
+      <button class="btn primary hidden" id="nextBtn">Next →</button>
+    </div>
+  </div>
+
+  <div id="end" class="hidden"></div>
+
+  <footer>Green = words you got · red = words you missed. Small words like "a" and "the" don't count against you. Tip: shift-click or press-and-hold the topic tabs to pick several.</footer>
+</div>
+
+<script>
+const IMG = {"kouros":"https://upload.wikimedia.org/wikipedia/commons/thumb/6/61/Kouros_of_Tenea_-_168_-_Glyptothek_Munich_-_DSC07368.jpg/960px-Kouros_of_Tenea_-_168_-_Glyptothek_Munich_-_DSC07368.jpg",
+"dory":"https://upload.wikimedia.org/wikipedia/commons/thumb/f/f2/Doryphoros._Naples,_National_Archaeological_Museum._(49059407566).jpg/960px-Doryphoros._Naples,_National_Archaeological_Museum._(49059407566).jpg",
+"laocoon":"https://upload.wikimedia.org/wikipedia/commons/thumb/b/bd/Laocoon_and_His_Sons.jpg/960px-Laocoon_and_His_Sons.jpg",
+"parthenon":"https://upload.wikimedia.org/wikipedia/commons/thumb/8/8f/Parthenon_from_south.jpg/960px-Parthenon_from_south.jpg",
+"orders":"https://upload.wikimedia.org/wikipedia/commons/thumb/a/a7/ARCHITECTURE_ORDERS_Greeks_Etruscan_Roman_(Doric_Ionic_Corinthian_Tuscan_Composite)_by_Paolo_Villa_ENG_edition.pdf/page1-960px-ARCHITECTURE_ORDERS_Greeks_Etruscan_Roman_(Doric_Ionic_Corinthian_Tuscan_Composite)_by_Paolo_Villa_ENG_edition.pdf.jpg",
+"augustus":"https://upload.wikimedia.org/wikipedia/commons/thumb/e/eb/Statue-Augustus.jpg/960px-Statue-Augustus.jpg",
+"colosseum":"https://upload.wikimedia.org/wikipedia/commons/thumb/5/53/Colosseum_in_Rome,_Italy_-_April_2007.jpg/960px-Colosseum_in_Rome,_Italy_-_April_2007.jpg",
+"justinian":"https://upload.wikimedia.org/wikipedia/commons/thumb/a/ad/Mosaic_of_Justinian_I_-_San_Vitale_-_Ravenna_2016.jpg/960px-Mosaic_of_Justinian_I_-_San_Vitale_-_Ravenna_2016.jpg",
+"sernin":"https://upload.wikimedia.org/wikipedia/commons/c/c3/Plan-Saint-Sernin-2005-09-19_2.png",
+"notre":"https://upload.wikimedia.org/wikipedia/commons/thumb/6/62/Notre-Dame_de_Paris_Floor_Plan_with_Compendious_List_and_Labels.png/960px-Notre-Dame_de_Paris_Floor_Plan_with_Compendious_List_and_Labels.png",
+"lament":"https://upload.wikimedia.org/wikipedia/commons/thumb/3/3a/Giotto_-_Scrovegni_-_-36-_-_Lamentation_(The_Mourning_of_Christ)_adj.jpg/960px-Giotto_-_Scrovegni_-_-36-_-_Lamentation_(The_Mourning_of_Christ)_adj.jpg",
+"venus":"https://upload.wikimedia.org/wikipedia/commons/thumb/0/0b/Sandro_Botticelli_-_La_nascita_di_Venere_-_Google_Art_Project_-_edited.jpg/960px-Sandro_Botticelli_-_La_nascita_di_Venere_-_Google_Art_Project_-_edited.jpg",
+"supper":"https://upload.wikimedia.org/wikipedia/commons/thumb/4/48/The_Last_Supper_-_Leonardo_Da_Vinci_-_High_Resolution_32x16.jpg/960px-The_Last_Supper_-_Leonardo_Da_Vinci_-_High_Resolution_32x16.jpg",
+"vitruvian":"https://upload.wikimedia.org/wikipedia/commons/thumb/2/22/Da_Vinci_Vitruve_Luc_Viatour.jpg/960px-Da_Vinci_Vitruve_Luc_Viatour.jpg",
+"judgment":"https://upload.wikimedia.org/wikipedia/commons/thumb/1/18/Last_Judgement_(Michelangelo).jpg/960px-Last_Judgement_(Michelangelo).jpg",
+"arch":"@arch"};
+
+// labelled Roman arch diagram, drawn here (own artwork) so it needs no image file
+function archSvg(){
+  const W=640,H=400,cx=300,cy=240,r1=100,r2=150,ink="#3b2a1a",n=11,st=180/n;
+  const P=(r,a)=>[cx+r*Math.cos(a*Math.PI/180),cy-r*Math.sin(a*Math.PI/180)], f=v=>v.toFixed(1);
+  let o=`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" font-family="Georgia,serif" font-size="15" fill="${ink}"><rect width="${W}" height="${H}" fill="#efe3c8"/>`;
+  for(const x of [cx-r2,cx+r1]) o+=`<rect x="${x}" y="${cy+18}" width="${r2-r1}" height="130" fill="#d9c49a" stroke="${ink}" stroke-width="2"/><rect x="${x-8}" y="${cy}" width="${r2-r1+16}" height="18" fill="#bfa77a" stroke="${ink}" stroke-width="2"/>`;
+  for(let i=0;i<n;i++){
+    const a=180-i*st,b=180-(i+1)*st,p1=P(r1,a),p2=P(r1,b),p3=P(r2,b),p4=P(r2,a);
+    const fill=i==5?"#e0a43c":(i==0||i==n-1)?"#c98f5a":"#d9c49a";
+    o+=`<path d="M${f(p1[0])},${f(p1[1])} A${r1},${r1} 0 0 1 ${f(p2[0])},${f(p2[1])} L${f(p3[0])},${f(p3[1])} A${r2},${r2} 0 0 0 ${f(p4[0])},${f(p4[1])} Z" fill="${fill}" stroke="${ink}" stroke-width="2"/>`;
+  }
+  o+=`<defs><marker id="a" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="${ink}"/></marker></defs>`;
+  o+=`<line x1="40" y1="${cy}" x2="600" y2="${cy}" stroke="#a33" stroke-width="1.5" stroke-dasharray="7 5"/>`;
+  o+=`<line x1="${cx-r1}" y1="310" x2="${cx+r1}" y2="310" stroke="${ink}" stroke-width="1.6" marker-start="url(#a)" marker-end="url(#a)"/><text x="${cx}" y="302" text-anchor="middle" font-weight="bold">Span</text>`;
+  o+=`<line x1="${cx}" y1="${cy-4}" x2="${cx}" y2="${cy-r1+4}" stroke="${ink}" stroke-width="1.6" marker-start="url(#a)" marker-end="url(#a)"/><text x="${cx+8}" y="200" font-weight="bold">Rise</text>`;
+  const lab=(t,tx,ty,p,an)=>{o+=`<line x1="${tx}" y1="${ty-5}" x2="${f(p[0])}" y2="${f(p[1])}" stroke="${ink}" stroke-width="1.2"/><circle cx="${f(p[0])}" cy="${f(p[1])}" r="3"/><text x="${tx}" y="${ty}" text-anchor="${an||"start"}" font-weight="bold">${t}</text>`};
+  const m=(r1+r2)/2;
+  lab("Keystone",cx,48,P(m,90),"middle"); lab("Voussoirs",470,95,P(m,50)); lab("Springer",40,190,P(m,175)); lab("Impost",40,300,[cx-r2+4,cy+9]);
+  return "data:image/svg+xml;charset=utf-8,"+encodeURIComponent(o+`<text x="596" y="${cy-8}" text-anchor="end" fill="#a33" font-weight="bold">Spring line</text></svg>`);
+}
+IMG.arch = archSvg();
+const CONFIG = {"title": "Visual Arts <span>Cram</span>", "subtitle": "Grade 10 IEB · The Vitruvian Man edition · type it word for word", "prompt": "Answer from memory."};
+const CARDS = [{"t":"Greek art: Humanism","g":"Greek Art","a":["Man is the measure of all things"],"p":"Give the phrase."},
+{"t":"Why Greek Olympic athletes competed nude","g":"Greek Art","a":["Heroism, perfection, and victory"],"p":"Name the three things."},
+{"t":"1.1 Geometric (Greek period)","g":"Greek Art","a":["Flat 2D geometric triangles and stick lines on pottery vases—zero shading or depth.","Flat 2D geometric triangles and stick lines on pottery vases (Attic Geometric Krater, Athens)—zero shading or depth."],"show":"Flat 2D geometric triangles and stick lines on pottery vases (Attic Geometric Krater, Athens)—zero shading or depth.","p":"Describe it in one sentence."},
+{"t":"1.2 Archaic (Greek period)","g":"Greek Art","a":["Life-size 3D carved marble (glyptic) inspired by Egypt, but stiff, rigid frontal pose with a fixed \"Archaic smile\"."],"p":"Describe it in one sentence."},
+{"t":"1.3 Classical (Greek period)","g":"Greek Art","a":["\"The Greek Ideal\" (Idealism)—relaxed contrapposto weight shift (S-curve), idealised muscles, and a calm, emotionless face."],"p":"Describe it in one sentence."},
+{"t":"1.4 Hellenistic (Greek period)","g":"Greek Art","a":["Opposite of Classical calm—raw agony/emotion, unstable twisting diagonal poses, and realism.","Opposite of Classical calm—raw agony/emotion, unstable twisting diagonal poses, and realism (pain, old age)."],"show":"Opposite of Classical calm—raw agony/emotion, unstable twisting diagonal poses, and realism (pain, old age).","p":"Describe it in one sentence."},
+{"t":"Archaic 3D sculpture (nude, freestanding)","g":"Greek Art","a":["Kouros from Tenea"],"p":"Name this artwork.","img":"kouros"},
+{"t":"Kouros from Tenea: artist","g":"Greek Art","a":["Anonymous"],"p":"Who is the artist?","img":"kouros"},
+{"t":"Kouros from Tenea: location","g":"Greek Art","a":["Tenea, Greece","Tenea (near Corinth), Greece"],"show":"Tenea (near Corinth), Greece","p":"Where is it?","img":"kouros"},
+{"t":"Kouros from Tenea: medium","g":"Greek Art","a":["Glyptic carved marble"],"p":"What is it made of / what medium?","img":"kouros"},
+{"t":"Kouros from Tenea: Egyptian influence","g":"Greek Art","a":["Rigid frontal pose, left foot stepping forward, arms clenched stiffly at sides","Rigid frontal pose, left foot stepping forward (weight equally on both flat feet), arms clenched stiffly at sides"],"show":"Rigid frontal pose, left foot stepping forward (weight equally on both flat feet), arms clenched stiffly at sides","p":"Give the exam point.","img":"kouros"},
+{"t":"Kouros from Tenea: break from Egypt","g":"Greek Art","a":["Completely nude and freestanding","Completely nude and freestanding (no back-pillar)"],"show":"Completely nude and freestanding (no back-pillar)","p":"Give the exam point.","img":"kouros"},
+{"t":"Kouros from Tenea: thighs and calves","g":"Greek Art","a":["Rounded thighs/calves"],"p":"Give the exam point.","img":"kouros"},
+{"t":"Kouros from Tenea: the head","g":"Greek Art","a":["Cubic head with beaded hair and the fixed \"Archaic smile\"","Cubic head with beaded hair and the fixed \"Archaic smile\" (showing life)"],"show":"Cubic head with beaded hair and the fixed \"Archaic smile\" (showing life)","p":"Give the exam point.","img":"kouros"},
+{"t":"Female Kore statues: how were they treated?","g":"Greek Art","a":["Clothed and painted with encaustic hot wax"],"p":"Complete it.","img":"kouros"},
+{"t":"Classical 3D sculpture (the athlete's pose)","g":"Greek Art","a":["Spear Bearer (Doryphoros)","Spear Bearer","Doryphoros"],"p":"Name this artwork.","img":"dory"},
+{"t":"Spear Bearer: artist","g":"Greek Art","a":["Polykleitos"],"p":"Who is the artist?","img":"dory"},
+{"t":"Spear Bearer: location","g":"Greek Art","a":["Greece","Greece (Roman copy from Pompeii, in Naples, Italy)"],"show":"Greece (Roman copy from Pompeii, in Naples, Italy)","p":"Where is it?","img":"dory"},
+{"t":"Spear Bearer: medium","g":"Greek Art","a":["Original: Bronze; Copy: Carved marble","Original: Bronze; Copy: Carved marble (with tree-stump support)"],"show":"Original: Bronze; Copy: Carved marble (with tree-stump support)","p":"What is it made of / what medium?","img":"dory"},
+{"t":"Spear Bearer: what it shows","g":"Greek Art","a":["Shows \"The Greek Ideal\"—flawless mathematical proportions of an athletic \"type\"","Shows \"The Greek Ideal\" (Idealism)—flawless mathematical proportions of an athletic \"type\""],"show":"Shows \"The Greek Ideal\" (Idealism)—flawless mathematical proportions of an athletic \"type\"","p":"Give the exam point.","img":"dory"},
+{"t":"Spear Bearer: the weight","g":"Greek Art","a":["Contrapposto: all weight on one straight right leg, left leg bent relaxed behind"],"p":"Give the exam point.","img":"dory"},
+{"t":"Spear Bearer: hips and shoulders","g":"Greek Art","a":["Hips and shoulders tilt in a natural S-curve with limbs freed from torso"],"p":"Give the exam point.","img":"dory"},
+{"t":"Spear Bearer: the face","g":"Greek Art","a":["Calm, relaxed, emotionless face","Calm, relaxed, emotionless face (rational self-control)"],"show":"Calm, relaxed, emotionless face (rational self-control)","p":"Give the exam point.","img":"dory"},
+{"t":"Hellenistic 3D sculpture (agony)","g":"Greek Art","a":["The Laocoön","The Laocoon","Laocoön","Laocoon"],"p":"Name this artwork.","img":"laocoon"},
+{"t":"The Laocoön: artist","g":"Greek Art","a":["Hagesandros, Polydoros & Athenodoros"],"p":"Who is the artist?","img":"laocoon"},
+{"t":"The Laocoön: location","g":"Greek Art","a":["Rhodes, Greece / Vatican Museums, Rome"],"p":"Where is it?","img":"laocoon"},
+{"t":"The Laocoön: medium","g":"Greek Art","a":["Carved marble"],"p":"What is it made of / what medium?","img":"laocoon"},
+{"t":"Hellenistic marble group: the story","g":"Greek Art","a":["Trojan priest Laocoön and his two sons strangled by sea snakes"],"p":"Give the exam point.","img":"laocoon"},
+{"t":"Hellenistic marble group: the emotion","g":"Greek Art","a":["Raw emotion & agony: heads flung back, faces contorted in pain"],"p":"Give the exam point.","img":"laocoon"},
+{"t":"Hellenistic marble group: the pose","g":"Greek Art","a":["Unstable, off-balance diagonal pose"],"p":"Give the exam point.","img":"laocoon"},
+{"t":"Hellenistic marble group: muscles and shadow","g":"Greek Art","a":["Hyper-realistic straining muscles & veins with deep shadows as snakes bind all three figures together","Hyper-realistic straining muscles & veins with deep shadows (chiaroscuro) as snakes bind all three figures together"],"show":"Hyper-realistic straining muscles & veins with deep shadows (chiaroscuro) as snakes bind all three figures together","p":"Give the exam point.","img":"laocoon"},
+{"t":"Greek building: temple on the hilltop","g":"Greek Art","a":["The Parthenon","Parthenon"],"p":"Name this artwork.","img":"parthenon"},
+{"t":"The Parthenon: architect","g":"Greek Art","a":["Iktinos & Kallikrates","Iktinos & Kallikrates (sculptures by Phidias; patron Pericles)"],"show":"Iktinos & Kallikrates (sculptures by Phidias; patron Pericles)","p":"Who is the architect?","img":"parthenon"},
+{"t":"The Parthenon: location","g":"Greek Art","a":["Acropolis, Athens, Greece"],"p":"Where is it?","img":"parthenon"},
+{"t":"The Parthenon: medium","g":"Greek Art","a":["Pentelic marble","Pentelic marble (Doric post-and-lintel temple)"],"show":"Pentelic marble (Doric post-and-lintel temple)","p":"What is it made of / what medium?","img":"parthenon"},
+{"t":"Greek hilltop temple: its purpose","g":"Greek Art","a":["Temple to Athena Parthenos & city treasury on the hilltop Acropolis","Temple to Athena Parthenos (goddess of wisdom) & city treasury on the hilltop Acropolis"],"show":"Temple to Athena Parthenos (goddess of wisdom) & city treasury on the hilltop Acropolis","p":"Give the exam point.","img":"parthenon"},
+{"t":"Greek hilltop temple: construction","g":"Greek Art","a":["Uses Post-and-Lintel construction","Uses Post-and-Lintel construction (vertical columns + horizontal entablature)"],"show":"Uses Post-and-Lintel construction (vertical columns + horizontal entablature)","p":"Give the exam point.","img":"parthenon"},
+{"t":"Greek hilltop temple: order and roof ends","g":"Greek Art","a":["Built in the sturdy Doric Order topped by triangular pediments"],"p":"Give the exam point.","img":"parthenon"},
+{"t":"Doric order (Greek column)","g":"Greek Art","a":["Sturdy, plain, NO base, plain capital.","Sturdy, plain, NO base (sits directly on stairs), plain capital."],"show":"Sturdy, plain, NO base (sits directly on stairs), plain capital.","p":"Describe it.","img":"orders"},
+{"t":"Ionic order (Greek column)","g":"Greek Art","a":["Thinner, taller, moulded base, scroll spirals on capital, dentils under cornice.","Thinner, taller, moulded base, scroll spirals (volutes) on capital, dentils under cornice."],"show":"Thinner, taller, moulded base, scroll spirals (volutes) on capital, dentils under cornice.","p":"Describe it.","img":"orders"},
+{"t":"Corinthian order (Greek column)","g":"Greek Art","a":["Most ornate, tall bell capital carved with acanthus leaves.","Most ornate, tall bell capital carved with acanthus leaves (used widely by Romans)."],"show":"Most ornate, tall bell capital carved with acanthus leaves (used widely by Romans).","p":"Describe it.","img":"orders"},
+{"t":"Which building shows the Doric order?","g":"Greek Art","a":["Parthenon"],"img":"orders"},
+{"t":"Which building shows the Ionic order?","g":"Greek Art","a":["Erechtheum"],"img":"orders"},
+{"t":"Which building shows the Corinthian order?","g":"Greek Art","a":["Temple of Zeus"],"img":"orders"},
+{"t":"Greek column labels, top to bottom","g":"Greek Art","a":["Pediment -> Entablature (Cornice, Frieze, Architrave) -> Capital -> Shaft -> Base"],"p":"List them in order.","img":"orders"},
+{"t":"Core rule of Roman art","g":"Roman Art","a":["Art served realism, public entertainment, and political propaganda for the Emperor."],"p":"Complete it."},
+{"t":"Roman artists: who were they?","g":"Roman Art","a":["Anonymous"]},
+{"t":"Roman painting (Theseus, Pompeii, fresco): what did it already have?","g":"Roman Art","a":["3D naturalism, contrapposto, chiaroscuro shading, and cast shadows","3D naturalism, contrapposto, chiaroscuro shading, and cast shadows (which was later lost in the Middle Ages)"],"show":"3D naturalism, contrapposto, chiaroscuro shading, and cast shadows (which was later lost in the Middle Ages)","p":"List them."},
+{"t":"Roman 3D propaganda sculpture (the emperor)","g":"Roman Art","a":["Prima Porta Augustus"],"p":"Name this artwork.","img":"augustus"},
+{"t":"Prima Porta Augustus: artist","g":"Roman Art","a":["Anonymous"],"p":"Who is the artist?","img":"augustus"},
+{"t":"Prima Porta Augustus: location","g":"Roman Art","a":["Rome, Italy","Rome, Italy (Vatican Museums)"],"show":"Rome, Italy (Vatican Museums)","p":"Where is it?","img":"augustus"},
+{"t":"Prima Porta Augustus: medium","g":"Roman Art","a":["Carved marble"],"p":"What is it made of / what medium?","img":"augustus"},
+{"t":"Prima Porta propaganda 1: Youthful Greek Idealisation","g":"Roman Art","a":["Copies the contrapposto pose of the Greek Spear Bearer with a calm, eternally young face."],"p":"Give the exam point.","img":"augustus"},
+{"t":"Prima Porta propaganda 2: Orator's Gesture","g":"Roman Art","a":["Right arm raised to address his troops with calm authority."],"p":"Give the exam point.","img":"augustus"},
+{"t":"Prima Porta propaganda 3: Breastplate (Armour) Reliefs","g":"Roman Art","a":["Shows Parthians returning Roman standards under sky/earth gods = Augustus brought divine peace & victory."],"p":"Give the exam point.","img":"augustus"},
+{"t":"Prima Porta propaganda 4: Cupid on a Dolphin at Foot","g":"Roman Art","a":["Cupid is the son of Venus = claims Augustus's family has divine ancestry from the gods."],"p":"Give the exam point.","img":"augustus"},
+{"t":"Prima Porta propaganda 5: Bare Feet","g":"Roman Art","a":["Symbol that Augustus is a god / divine hero."],"p":"Give the exam point.","img":"augustus"},
+{"t":"Roman architecture (entertainment for the people)","g":"Roman Art","a":["The Colosseum","Colosseum"],"p":"Name this artwork.","img":"colosseum"},
+{"t":"The Colosseum: architect","g":"Roman Art","a":["Anonymous"],"p":"Who is the architect?","img":"colosseum"},
+{"t":"The Colosseum: location","g":"Roman Art","a":["Rome, Italy"],"p":"Where is it?","img":"colosseum"},
+{"t":"The Colosseum: medium","g":"Roman Art","a":["Roman pozzolana concrete, stone, brick & barrel/groin vaults","Roman pozzolana concrete (volcanic ash mortar), stone, brick & barrel/groin vaults"],"show":"Roman pozzolana concrete (volcanic ash mortar), stone, brick & barrel/groin vaults","p":"What is it made of / what medium?","img":"colosseum"},
+{"t":"Colosseum 1: Purpose (Propaganda & Entertainment)","g":"Roman Art","a":["Seated 55,000 spectators via 80 arched entrances for free gladiator & animal fights to boost the Emperor's popularity."],"p":"Give the exam point.","img":"colosseum"},
+{"t":"Colosseum 2: Social Hierarchy","g":"Roman Art","a":["Important citizens sat at the bottom; women and lower classes sat at the top."],"p":"Give the exam point.","img":"colosseum"},
+{"t":"Colosseum 3: Underground Cages","g":"Roman Art","a":["Traps and pulley hoists under the floor lifted wild animals into the arena."],"p":"Give the exam point.","img":"colosseum"},
+{"t":"Colosseum 4: 4-Storey Column Order Hierarchy (Bottom to Top)","g":"Roman Art","a":["Storey 1 = Doric, Storey 2 = Ionic, Storey 3 = Corinthian attached columns framing the arches; Storey 4 = Top wall."],"p":"Give the exam point.","img":"colosseum"},
+{"t":"Arch of Constantine, Rome: whose reliefs were recycled?","g":"Roman Art","a":["The \"Good Emperors\" Trajan, Hadrian & Marcus Aurelius"]},
+{"t":"Arch of Constantine, Rome: why were reliefs recycled?","g":"Roman Art","a":["Lack of skilled artisans, lack of time, propaganda"],"p":"Give the three reasons."},
+{"t":"Arch label: Voussoirs","g":"Roman Art","a":["Wedge stones"],"p":"What is it?","img":"arch"},
+{"t":"Arch label: Keystone","g":"Roman Art","a":["Top centre locking stone"],"p":"What is it?","img":"arch"},
+{"t":"Arch label: Springer","g":"Roman Art","a":["Lowest arch stone"],"p":"What is it?","img":"arch"},
+{"t":"Arch label: Spring Line","g":"Roman Art","a":["Horizontal start line"],"p":"What is it?","img":"arch"},
+{"t":"Arch label: Impost","g":"Roman Art","a":["Block between capital & arch"],"p":"What is it?","img":"arch"},
+{"t":"Arch label: Rise","g":"Roman Art","a":["Height"],"p":"What is it?","img":"arch"},
+{"t":"Arch label: Span","g":"Roman Art","a":["Width"],"p":"What is it?","img":"arch"},
+{"t":"Arch label: Barrel Vault","g":"Roman Art","a":["Tunnel ceiling"],"p":"What is it?"},
+{"t":"Arch label: Cross/Groin Vault","g":"Roman Art","a":["2 intersecting barrel vaults"],"p":"What is it?"},
+{"t":"Core rule of Medieval art: why did art exist?","g":"Medieval Art","a":["To glorify God and teach Bible stories to illiterate people"],"p":"After Constantine legalised Christianity..."},
+{"t":"Medieval style: what did artists use?","g":"Medieval Art","a":["Flat 2D figures, rigid frontality, staring eyes, heavy robes, gold backgrounds, and hierarchical scale","Flat 2D figures, rigid frontality, staring eyes, heavy robes, gold backgrounds (heaven), and hierarchical scale"],"show":"Flat 2D figures, rigid frontality, staring eyes, heavy robes, gold backgrounds (heaven), and hierarchical scale","p":"List them."},
+{"t":"Medieval hierarchical scale means...","g":"Medieval Art","a":["Important figures largest"]},
+{"t":"Baby Jesus in Medieval art","g":"Medieval Art","a":["\"mini-adult\"","mini-adult"],"p":"What was he shown as?"},
+{"t":"3.1 Early Christian (Medieval period)","g":"Medieval Art","a":["Hybrid bridge—underground Catacombs and wooden-roofed Basilicas; mosaics mix Christian \"head-clusters\" with old Roman 3D shading.","Hybrid bridge—underground Catacombs (loculi graves, cubicula rooms) and wooden-roofed Basilicas (Old St. Peter's, Rome); mosaics (Parting of Lot & Abraham) mix Christian \"head-clusters\" with old Roman 3D shading."],"show":"Hybrid bridge—underground Catacombs (loculi graves, cubicula rooms) and wooden-roofed Basilicas (Old St. Peter's, Rome); mosaics (Parting of Lot & Abraham) mix Christian \"head-clusters\" with old Roman 3D shading.","p":"Describe it in one sentence."},
+{"t":"3.2 Byzantine (Medieval period)","g":"Medieval Art","a":["Complete flatness—stiff frontal figures, staring eyes, floating V-feet, solid gold backgrounds, wooden Icons, and huge central domes.","Complete flatness—stiff frontal figures, staring eyes, floating V-feet, solid gold backgrounds, wooden Icons (Vladimir Madonna), and huge central domes (Hagia Sophia, Constantinople)."],"show":"Complete flatness—stiff frontal figures, staring eyes, floating V-feet, solid gold backgrounds, wooden Icons (Vladimir Madonna), and huge central domes (Hagia Sophia, Constantinople).","p":"Describe it in one sentence."},
+{"t":"3.3 Romanesque (Medieval period)","g":"Medieval Art","a":["\"Roman-like\" heavy stone churches—round arches, heavy barrel vaults, thick dark walls, cruciform piers, and flat illuminated manuscripts on vellum.","\"Roman-like\" heavy stone churches (St. Sernin, Toulouse)—round arches, heavy barrel vaults, thick dark walls, cruciform piers, and flat illuminated manuscripts on vellum (Book of Kells)."],"show":"\"Roman-like\" heavy stone churches (St. Sernin, Toulouse)—round arches, heavy barrel vaults, thick dark walls, cruciform piers, and flat illuminated manuscripts on vellum (Book of Kells).","p":"Describe it in one sentence."},
+{"t":"3.4 Gothic (Medieval period)","g":"Medieval Art","a":["Soaring height & light—pointed arches, ribbed vaults, external flying buttresses, huge stained-glass Rose Windows, and more 3D portal jamb statues.","Soaring height & light (Notre Dame, Paris)—pointed arches, ribbed vaults, external flying buttresses, huge stained-glass Rose Windows, and more 3D portal jamb statues."],"show":"Soaring height & light (Notre Dame, Paris)—pointed arches, ribbed vaults, external flying buttresses, huge stained-glass Rose Windows, and more 3D portal jamb statues.","p":"Describe it in one sentence."},
+{"t":"Byzantine 2D mosaic (the emperor and his court)","g":"Medieval Art","a":["Mosaic of Justinian and Retinue"],"p":"Name this artwork.","img":"justinian"},
+{"t":"Mosaic of Justinian and Retinue: artist","g":"Medieval Art","a":["Anonymous"],"p":"Who is the artist?","img":"justinian"},
+{"t":"Mosaic of Justinian and Retinue: location","g":"Medieval Art","a":["Church of San Vitale, Ravenna, Italy"],"p":"Where is it?","img":"justinian"},
+{"t":"Mosaic of Justinian and Retinue: medium","g":"Medieval Art","a":["Glass and gold-leaf tesserae mosaic"],"p":"What is it made of / what medium?","img":"justinian"},
+{"t":"Justinian mosaic 1: Strict Frontality & Staring Eyes","g":"Medieval Art","a":["Figures face straight forward with long narrow faces, staring almond eyes, and zero emotion."],"p":"Give the exam point.","img":"justinian"},
+{"t":"Justinian mosaic 2: Flat 2D Linear Drapery","g":"Medieval Art","a":["Stiff vertical lines hide the body—no 3D shading and no body felt underneath.","Stiff vertical lines hide the body—no 3D shading (chiaroscuro) and no body felt underneath."],"show":"Stiff vertical lines hide the body—no 3D shading (chiaroscuro) and no body felt underneath.","p":"Give the exam point.","img":"justinian"},
+{"t":"Justinian mosaic 3: Weightless Hovering Feet","g":"Medieval Art","a":["Pointed V-shaped feet overlap and float off the ground."],"p":"Give the exam point.","img":"justinian"},
+{"t":"Justinian mosaic 4: Flat Solid Gold Background & Halo","g":"Medieval Art","a":["Radiant gold background represents eternal heaven; Justinian wears a flat gold halo at the centre.","Radiant gold background represents eternal heaven (zero depth); Justinian wears a flat gold halo at the centre."],"show":"Radiant gold background represents eternal heaven (zero depth); Justinian wears a flat gold halo at the centre.","p":"Give the exam point.","img":"justinian"},
+{"t":"Basilica plan, entrance to altar","g":"Medieval Art","a":["Atrium (courtyard) -> Narthex (foyer) -> Nave (central hall) + Side-Aisles -> Transept (cross-arm) -> Apse (semi-circular altar end above Crypt)"],"p":"List the parts in order.","img":"sernin"},
+{"t":"Basilica plan part: Atrium","g":"Medieval Art","a":["Courtyard"],"p":"What is it?","img":"sernin"},
+{"t":"Basilica plan part: Narthex","g":"Medieval Art","a":["Foyer"],"p":"What is it?","img":"sernin"},
+{"t":"Basilica plan part: Nave","g":"Medieval Art","a":["Central hall"],"p":"What is it?","img":"sernin"},
+{"t":"Basilica plan part: Transept","g":"Medieval Art","a":["Cross-arm"],"p":"What is it?","img":"sernin"},
+{"t":"Basilica plan part: Apse","g":"Medieval Art","a":["Semi-circular altar end above Crypt"],"p":"What is it?","img":"sernin"},
+{"t":"A stone vault is...","g":"Medieval Art","a":["A ceiling, NOT the outer roof","A ceiling, NOT the outer roof (a wooden timber-trussed roof sits on top)"],"show":"A ceiling, NOT the outer roof (a wooden timber-trussed roof sits on top)","p":"Complete it."},
+{"t":"Church of Saint-Sernin (Romanesque): location","g":"Medieval Art","a":["Toulouse, France"],"img":"sernin"},
+{"t":"Cathedral of Notre Dame (Gothic): location","g":"Medieval Art","a":["Paris, France"],"img":"notre"},
+{"t":"Church of Saint-Sernin (Romanesque): architect and medium","g":"Medieval Art","a":["Anonymous; stone masonry."],"p":"Compare (Slide 42).","img":"sernin"},
+{"t":"Cathedral of Notre Dame (Gothic): architect and medium","g":"Medieval Art","a":["Anonymous; limestone masonry & stained glass."],"p":"Compare (Slide 42).","img":"notre"},
+{"t":"Church of Saint-Sernin (Romanesque): arch type","g":"Medieval Art","a":["Round (semi-circular) arch"],"p":"Compare (Slide 42).","img":"sernin"},
+{"t":"Cathedral of Notre Dame (Gothic): arch type","g":"Medieval Art","a":["Pointed arch (stronger, channels weight down)"],"p":"Compare (Slide 42).","img":"notre"},
+{"t":"Church of Saint-Sernin (Romanesque): vault system","g":"Medieval Art","a":["Heavy solid barrel vault and cross vault"],"p":"Compare (Slide 42).","img":"sernin"},
+{"t":"Cathedral of Notre Dame (Gothic): vault system","g":"Medieval Art","a":["Lighter skeletal ribbed vault"],"p":"Compare (Slide 42).","img":"notre"},
+{"t":"Church of Saint-Sernin (Romanesque): walls and support","g":"Medieval Art","a":["Thick, heavy, bulky walls, flat buttresses & cruciform piers"],"p":"Compare (Slide 42).","img":"sernin"},
+{"t":"Cathedral of Notre Dame (Gothic): walls and support","g":"Medieval Art","a":["Thin, taller walls, slender columns & external flying buttresses (\"crutches\")"],"p":"Compare (Slide 42).","img":"notre"},
+{"t":"Church of Saint-Sernin (Romanesque): light and windows","g":"Medieval Art","a":["Small windows — not much light (dark interior)"],"p":"Compare (Slide 42).","img":"sernin"},
+{"t":"Cathedral of Notre Dame (Gothic): light and windows","g":"Medieval Art","a":["Huge stained-glass & Rose Windows (stone tracery) — flooded with light"],"p":"Compare (Slide 42).","img":"notre"},
+{"t":"Church of Saint-Sernin (Romanesque): floor plan","g":"Medieval Art","a":["Transept projects out to form a cross (on plan)"],"p":"Compare (Slide 42).","img":"sernin"},
+{"t":"Cathedral of Notre Dame (Gothic): floor plan","g":"Medieval Art","a":["Transept divides the nave (on plan)"],"p":"Compare (Slide 42).","img":"notre"},
+{"t":"Renaissance patrons: who paid for the art?","g":"Renaissance","a":["Wealthy merchant/banking families","Wealthy merchant/banking families (Medici in Florence, Scrovegni in Padua)"],"show":"Wealthy merchant/banking families (Medici in Florence, Scrovegni in Padua)"},
+{"t":"What did Humanism revive in the Renaissance?","g":"Renaissance","a":["Classical Greek & Roman anatomy and nudity"]},
+{"t":"Bottega","g":"Renaissance","a":["Workshop"],"p":"What is it?"},
+{"t":"Perspective lines & focal point","g":"Renaissance","a":["Diagonal lines meet at a vanishing point on the horizon to create 3D room depth and point directly behind the main figure's head","Diagonal lines meet at a vanishing point on the horizon to create 3D room depth and point directly behind the main figure's head (e.g., Jesus in The Last Supper)"],"show":"Diagonal lines meet at a vanishing point on the horizon to create 3D room depth and point directly behind the main figure's head (e.g., Jesus in The Last Supper)","p":"Define it."},
+{"t":"Chiaroscuro (modelling)","g":"Renaissance","a":["Light-and-dark shading to make flat figures look rounded and 3D with physical weight, showing the body under clothing."],"p":"Define it."},
+{"t":"Sfumato","g":"Renaissance","a":["Coined by Leonardo—\"smoky\" blurred outlines.","\"Smoky\" blurred outlines."],"p":"Define it."},
+{"t":"Atmospheric perspective","g":"Renaissance","a":["Distant colours become lighter/paler toward the horizon"],"p":"Define it."},
+{"t":"The 3 new Renaissance pigments","g":"Renaissance","a":["Naples yellow, smalt, and carmine lake","Naples yellow, smalt (blue), and carmine lake (red from cochineal beetles)"],"show":"Naples yellow, smalt (blue), and carmine lake (red from cochineal beetles)","p":"Name them."},
+{"t":"Medieval to Renaissance shift: depth","g":"Renaissance","a":["Foreground, middle ground, background","Foreground, middle ground, background (overlapping, diagonal lines, linear & atmospheric perspective)"],"show":"Foreground, middle ground, background (overlapping, diagonal lines, linear & atmospheric perspective)","p":"Flat 2D becomes..."},
+{"t":"Medieval to Renaissance shift: backgrounds","g":"Renaissance","a":["Blue skies, nature landscapes & 3D rooms","Blue skies, nature landscapes & 3D rooms (earth)"],"show":"Blue skies, nature landscapes & 3D rooms (earth)","p":"Flat gold leaf (heaven) becomes..."},
+{"t":"Medieval to Renaissance shift: 3D bodies","g":"Renaissance","a":["Rounded 3D bodies with weight, anatomy, contrapposto, profile/back views"],"p":"Flat, frontal, weightless becomes..."},
+{"t":"Medieval to Renaissance shift: emotion","g":"Renaissance","a":["Real human emotion, weeping & empathy"],"p":"Stoic/emotionless becomes..."},
+{"t":"High Renaissance rule","g":"Renaissance","a":["Extreme naturalism -> nothing looks Medieval anymore (gold disc halos vanish!)."],"p":"Complete it."},
+{"t":"Proto-Renaissance fresco (mourning)","g":"Renaissance","a":["The Lamentation","Lamentation"],"p":"Name this artwork.","img":"lament"},
+{"t":"The Lamentation: artist","g":"Renaissance","a":["Giotto di Bondone","Giotto di Bondone (Giotto)"],"show":"Giotto di Bondone (Giotto)","p":"Who is the artist?","img":"lament"},
+{"t":"The Lamentation: location","g":"Renaissance","a":["Scrovegni Chapel, Padua, Italy","Scrovegni (Arena) Chapel, Padua, Italy"],"show":"Scrovegni (Arena) Chapel, Padua, Italy","p":"Where is it?","img":"lament"},
+{"t":"The Lamentation: medium","g":"Renaissance","a":["Fresco","Fresco (wet plaster)"],"show":"Fresco (wet plaster)","p":"What is it made of / what medium?","img":"lament"},
+{"t":"The Lamentation: subject","g":"Renaissance","a":["Mary holds and mourns the dead body of Jesus after the crucifixion, surrounded by weeping friends and angels."],"p":"What does it show?","img":"lament"},
+{"t":"The Lamentation 1: Still Medieval","g":"Renaissance","a":["Figures still wear flat gold disc halos.","Figures still wear flat gold disc halos (like yellow hats)."],"show":"Figures still wear flat gold disc halos (like yellow hats).","p":"Give the exam point.","img":"lament"},
+{"t":"The Lamentation 2: Raw Emotion & Backs Turned","g":"Renaissance","a":["Weeping faces, John flinging his arms back in grief, and two foreground figures sitting with their backs turned to frame Christ."],"p":"Give the exam point.","img":"lament"},
+{"t":"The Lamentation 3: 3D Chiaroscuro Weight","g":"Renaissance","a":["Light/dark modelling gives the cloaks rounded 3D mass and weight on the ground.","Light/dark modelling gives the cloaks rounded 3D mass and weight on the ground (knee pressing through cloth)."],"show":"Light/dark modelling gives the cloaks rounded 3D mass and weight on the ground (knee pressing through cloth).","p":"Give the exam point.","img":"lament"},
+{"t":"The Lamentation 4: Depth & Blue Sky","g":"Renaissance","a":["Overlapping figures, a steep diagonal rock pointing straight down to Mary & Jesus, and a blue sky instead of gold."],"p":"Give the exam point.","img":"lament"},
+{"t":"Early Renaissance tempera painting (goddess and sea)","g":"Renaissance","a":["The Birth of Venus","Birth of Venus"],"p":"Name this artwork.","img":"venus"},
+{"t":"The Birth of Venus: artist","g":"Renaissance","a":["Sandro Botticelli"],"p":"Who is the artist?","img":"venus"},
+{"t":"The Birth of Venus: location","g":"Renaissance","a":["Florence, Italy","Florence, Italy (Uffizi Gallery)"],"show":"Florence, Italy (Uffizi Gallery)","p":"Where is it?","img":"venus"},
+{"t":"The Birth of Venus: medium","g":"Renaissance","a":["Tempera on canvas","Tempera on canvas (matte colours)"],"show":"Tempera on canvas (matte colours)","p":"What is it made of / what medium?","img":"venus"},
+{"t":"The Birth of Venus: subject","g":"Renaissance","a":["Classical mythology: Venus born on a sea shell, blown to shore by Zephyr & Chloris while Pomona holds a cloak.","Classical mythology: Venus (goddess of love) born on a sea shell, blown to shore by Zephyr & Chloris (left) while Pomona holds a cloak (right)."],"show":"Classical mythology: Venus (goddess of love) born on a sea shell, blown to shore by Zephyr & Chloris (left) while Pomona holds a cloak (right).","p":"What does it show?","img":"venus"},
+{"t":"The Birth of Venus 1: Classical & Naturalistic","g":"Renaissance","a":["First life-size naked woman since Greece/Rome, standing in contrapposto with 3D shading and porcelain flesh tones."],"p":"Give the exam point.","img":"venus"},
+{"t":"The Birth of Venus 2: Still Stylized (\"In-Between\")","g":"Renaissance","a":["Flat V-shaped waves, decorative flowers, and visible wind lines drawn blowing from Zephyr's mouth."],"p":"Give the exam point.","img":"venus"},
+{"t":"Madonna comparison: Leonardo's Virgin of the Rocks or Lippi's Madonna","g":"Renaissance","a":["Real young mother, chubby human baby Jesus, 3D chiaroscuro triangle, and distant atmospheric perspective landscape"],"p":"What do you see (vs the flat gold-background Byzantine Icon)?"},
+{"t":"High Renaissance fresco (Jesus and the 12)","g":"Renaissance","a":["The Last Supper","Last Supper"],"p":"Name this artwork.","img":"supper"},
+{"t":"The Last Supper: artist","g":"Renaissance","a":["Leonardo da Vinci"],"p":"Who is the artist?","img":"supper"},
+{"t":"The Last Supper: location","g":"Renaissance","a":["Monastery of Santa Maria delle Grazie, Milan, Italy"],"p":"Where is it?","img":"supper"},
+{"t":"The Last Supper: medium","g":"Renaissance","a":["Fresco","Fresco (oil/tempera on plaster; uses Naples yellow, smalt blue, carmine lake)"],"show":"Fresco (oil/tempera on plaster; uses Naples yellow, smalt blue, carmine lake)","p":"What is it made of / what medium?","img":"supper"},
+{"t":"The Last Supper: subject","g":"Renaissance","a":["Jesus sits at the centre of the table and announces that one of His 12 apostles will betray Him."],"p":"What does it show?","img":"supper"},
+{"t":"The Last Supper 1: One-Point Linear Perspective & Focal Point","g":"Renaissance","a":["All diagonal ceiling/wall perspective lines meet at the vanishing point directly behind Christ's head = deep 3D room + Christ is the focal point.","All diagonal ceiling/wall perspective lines meet at the vanishing point directly behind Christ's head (framed by the window) = deep 3D room + Christ is the focal point."],"show":"All diagonal ceiling/wall perspective lines meet at the vanishing point directly behind Christ's head (framed by the window) = deep 3D room + Christ is the focal point.","p":"Give the exam point.","img":"supper"},
+{"t":"The Last Supper 2: Grouping in 3s & Emotion","g":"Renaissance","a":["Calm triangular Christ in the centre; 12 apostles in 4 groups of 3 reacting with shock.","Calm triangular Christ in the centre; 12 apostles in 4 groups of 3 reacting with shock (Judas in shadow clutching silver; two quiet end figures bracket the frame)."],"show":"Calm triangular Christ in the centre; 12 apostles in 4 groups of 3 reacting with shock (Judas in shadow clutching silver; two quiet end figures bracket the frame).","p":"Give the exam point.","img":"supper"},
+{"t":"The Last Supper 3: Sfumato & Chiaroscuro","g":"Renaissance","a":["Smoky blurred outlines and 3D light/dark modelling."],"p":"Give the exam point.","img":"supper"},
+{"t":"High Renaissance drawing (your own work)","g":"Renaissance","a":["The Vitruvian Man","Vitruvian Man"],"p":"Name this artwork.","img":"vitruvian"},
+{"t":"The Vitruvian Man: artist","g":"Renaissance","a":["Leonardo da Vinci"],"p":"Who is the artist?","img":"vitruvian"},
+{"t":"The Vitruvian Man: location","g":"Renaissance","a":["Milan / Venice, Italy"],"p":"Where is it?","img":"vitruvian"},
+{"t":"The Vitruvian Man: medium","g":"Renaissance","a":["Pen and ink with watercolour wash on paper","Pen and ink with watercolour wash on paper (with mirror-writing notes)"],"show":"Pen and ink with watercolour wash on paper (with mirror-writing notes)","p":"What is it made of / what medium?","img":"vitruvian"},
+{"t":"The Vitruvian Man: subject","g":"Renaissance","a":["Nude man in 2 overlapping positions inside a Square and a Circle.","Nude man in 2 overlapping positions inside a Square and a Circle (based on Roman architect Vitruvius)."],"show":"Nude man in 2 overlapping positions inside a Square and a Circle (based on Roman architect Vitruvius).","p":"What does it show?","img":"vitruvian"},
+{"t":"The Vitruvian Man 1: Square (Physical Earth)","g":"Renaissance","a":["Legs together, arms straight out -> arm span = height.","Legs together, arms straight out -> arm span = height (centre = groin)."],"show":"Legs together, arms straight out -> arm span = height (centre = groin).","p":"Give the exam point.","img":"vitruvian"},
+{"t":"The Vitruvian Man 2: Circle (Spiritual Universe)","g":"Renaissance","a":["Legs spread, arms raised -> hands & feet touch circle.","Legs spread, arms raised -> hands & feet touch circle (centre = navel / belly button)."],"show":"Legs spread, arms raised -> hands & feet touch circle (centre = navel / belly button).","p":"Give the exam point.","img":"vitruvian"},
+{"t":"The Vitruvian Man 4: Visual Analysis & Humanism","g":"Renaissance","a":["Crisp contour lines + hatching for 3D muscle volume; artistic nudity from real dissections proves Humanism.","Crisp contour lines + hatching (chiaroscuro) for 3D muscle volume; artistic nudity from real dissections proves Humanism (\"Man is the measure of all things\")."],"show":"Crisp contour lines + hatching (chiaroscuro) for 3D muscle volume; artistic nudity from real dissections proves Humanism (\"Man is the measure of all things\").","p":"Give the exam point.","img":"vitruvian"},
+{"t":"The Vitruvian Man 3: Proportions, Head","g":"Renaissance","a":["1/8 of height"],"p":"What fraction of height?","img":"vitruvian"},
+{"t":"The Vitruvian Man 3: Proportions, Face","g":"Renaissance","a":["1/10"],"p":"What fraction of height?","img":"vitruvian"},
+{"t":"The Vitruvian Man 3: Proportions, Cubit (elbow to fingertip)","g":"Renaissance","a":["1/4"],"p":"What fraction of height?","img":"vitruvian"},
+{"t":"High Renaissance altar-wall fresco (hundreds of twisting figures)","g":"Renaissance","a":["The Last Judgment","Last Judgment","The Last Judgement","Last Judgement"],"p":"Name this artwork.","img":"judgment"},
+{"t":"The Last Judgment: artist","g":"Renaissance","a":["Michelangelo"],"p":"Who is the artist?","img":"judgment"},
+{"t":"The Last Judgment: location","g":"Renaissance","a":["Sistine Chapel, Rome"],"p":"Where is it?","img":"judgment"},
+{"t":"Byzantine: Justinian & Retinue (San Vitale, Ravenna): Artist & Medium","g":"15-Mark Table","a":["Anonymous; glass & gold mosaic."],"p":"15-mark comparison. Give the point.","img":"justinian"},
+{"t":"Proto-Renaissance: Giotto, The Lamentation (Padua): Artist & Medium","g":"15-Mark Table","a":["Giotto; wall fresco."],"p":"15-mark comparison. Give the point.","img":"lament"},
+{"t":"High Renaissance: Michelangelo, The Last Judgment (Sistine Chapel, Rome): Artist & Medium","g":"15-Mark Table","a":["Michelangelo; altar wall fresco."],"p":"15-mark comparison. Give the point.","img":"judgment"},
+{"t":"Byzantine: Justinian & Retinue (San Vitale, Ravenna): 3D Body & Pose","g":"15-Mark Table","a":["Flat 2D, rigid frontality; linear robes hide body; floating V-feet."],"p":"15-mark comparison. Give the point.","img":"justinian"},
+{"t":"Proto-Renaissance: Giotto, The Lamentation (Padua): 3D Body & Pose","g":"15-Mark Table","a":["Rounded 3D weight (chiaroscuro); profile & back views on ground."],"p":"15-mark comparison. Give the point.","img":"lament"},
+{"t":"High Renaissance: Michelangelo, The Last Judgment (Sistine Chapel, Rome): 3D Body & Pose","g":"15-Mark Table","a":["Heroic nude muscular & skeletal anatomy in twisting contrapposto."],"p":"15-mark comparison. Give the point.","img":"judgment"},
+{"t":"Byzantine: Justinian & Retinue (San Vitale, Ravenna): Emotion","g":"15-Mark Table","a":["Stoic, emotionless, staring eyes."],"p":"15-mark comparison. Give the point.","img":"justinian"},
+{"t":"Proto-Renaissance: Giotto, The Lamentation (Padua): Emotion","g":"15-Mark Table","a":["Raw human grief & weeping (John flinging arms back)."],"p":"15-mark comparison. Give the point.","img":"lament"},
+{"t":"High Renaissance: Michelangelo, The Last Judgment (Sistine Chapel, Rome): Emotion","g":"15-Mark Table","a":["Intense dramatic emotion across hundreds of twisting figures."],"p":"15-mark comparison. Give the point.","img":"judgment"},
+{"t":"Byzantine: Justinian & Retinue (San Vitale, Ravenna): Space & Background","g":"15-Mark Table","a":["Flat solid gold background (heaven); zero depth."],"p":"15-mark comparison. Give the point.","img":"justinian"},
+{"t":"Proto-Renaissance: Giotto, The Lamentation (Padua): Space & Background","g":"15-Mark Table","a":["Blue sky & diagonal rock; overlapping creates foreground/middle/background."],"p":"15-mark comparison. Give the point.","img":"lament"},
+{"t":"High Renaissance: Michelangelo, The Last Judgment (Sistine Chapel, Rome): Space & Background","g":"15-Mark Table","a":["Deep blue sky; 3D layering via foreshortening."],"p":"15-mark comparison. Give the point.","img":"judgment"},
+{"t":"Byzantine: Justinian & Retinue (San Vitale, Ravenna): Halos & Humanism","g":"15-Mark Table","a":["Flat gold halo on Emperor."],"p":"15-mark comparison. Give the point.","img":"justinian"},
+{"t":"Proto-Renaissance: Giotto, The Lamentation (Padua): Halos & Humanism","g":"15-Mark Table","a":["Still keeps flat gold disc halos (yellow hats = link to Medieval!)."],"p":"15-mark comparison. Give the point.","img":"lament"},
+{"t":"High Renaissance: Michelangelo, The Last Judgment (Sistine Chapel, Rome): Halos & Humanism","g":"15-Mark Table","a":["No gold disc halos! Replaced by a natural burst of yellow light behind Christ (Humanism)."],"p":"15-mark comparison. Give the point.","img":"judgment"}];
+const THEME = {"fonts": {"url": "https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=EB+Garamond:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap", "body": "'EB Garamond'", "display": "'Cinzel'"}, "colors": {"bg": "#120d09", "panel": "#1d1610", "panel2": "#271d14", "line": "#4a3826", "text": "#f1e6d0", "muted": "#a8977c", "accent": "#e0b252", "accent2": "#c9593d", "glow1": "#3a2410", "glow2": "#3b1a14", "good": "#8fd18a", "close": "#f0c75e", "bad": "#ef7a6a"}, "bg": {"kind": "falling", "colors": ["#e0b252", "#c9593d", "#f1e6d0"], "count": 70}, "confetti": ["#e0b252", "#c9593d", "#f1e6d0", "#8fd18a", "#ffffff"]};
+
+(function applyTheme(){
+  const r=document.documentElement.style, c=THEME.colors||{};
+  for(const k in c) r.setProperty("--"+k,c[k]);
+  if(THEME.fonts){ r.setProperty("--font",THEME.fonts.body); r.setProperty("--display",THEME.fonts.display);
+    document.querySelector('link[href*="fonts.googleapis.com/css2"]').href=THEME.fonts.url; }
+})();
+
+const SOFT = new Set(["a","an","the"]);
+const norm = w => w.toLowerCase().replace(/[’']/g,"'").replace(/[^a-z0-9']/g,"").replace(/'s$/,"s");
+const words = s => s.split(/\s+/).map(w=>({raw:w,n:norm(w)})).filter(w=>w.n);
+
+// LCS over significant words -> which answer words matched, which typed words matched
+function compare(answer, typed){
+  const A = words(answer), T = words(typed);
+  const ai = A.map((w,i)=>i).filter(i=>!SOFT.has(A[i].n));
+  const ti = T.map((w,i)=>i).filter(i=>!SOFT.has(T[i].n));
+  const n=ai.length, m=ti.length, dp=[...Array(n+1)].map(()=>new Array(m+1).fill(0));
+  for(let i=n-1;i>=0;i--)for(let j=m-1;j>=0;j--)
+    dp[i][j] = A[ai[i]].n===T[ti[j]].n ? dp[i+1][j+1]+1 : Math.max(dp[i+1][j],dp[i][j+1]);
+  const hitA=new Set(), hitT=new Set(); let i=0,j=0;
+  while(i<n&&j<m){
+    if(A[ai[i]].n===T[ti[j]].n){hitA.add(ai[i]);hitT.add(ti[j]);i++;j++}
+    else if(dp[i+1][j]>=dp[i][j+1])i++; else j++;
+  }
+  const lcs=dp[0][0];
+  const recall = n? lcs/n : 0, precision = m? lcs/m : 0;
+  const score = Math.round(100 * (0.85*recall + 0.15*precision));
+  return {A,T,hitA,hitT,score,recall};
+}
+
+// ---------- state ----------
+let deck=[], idx=0, right=0, streak=0, missed=[], phase="ask", filter=new Set();   // filter = selected groups, empty = all
+const $ = id=>document.getElementById(id);
+const card=$("card"), input=$("input");
+
+function shuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.random()*(i+1)|0;[a[i],a[j]]=[a[j],a[i]]}return a}
+function start(list){
+  deck = shuffle([...list]); idx=0; right=0; streak=0; missed=[];
+  $("game").classList.remove("hidden"); $("end").classList.add("hidden");
+  show(); updateStats();
+}
+function updateStats(){
+  $("sDone").textContent = `${Math.min(idx+1,deck.length)}/${deck.length}`;
+  $("sRight").textContent = right; $("sStreak").textContent = streak;
+  $("bar").style.width = (idx/deck.length*100)+"%";
+}
+// artwork / diagram image: front shows it big, back keeps a small copy next to the answer
+function setPics(c){
+  for(const id of ["pic","picBack"]){
+    const el=$(id);
+    if(c.img){ el.classList.remove("hidden"); el.alt=c.t; el.src=IMG[c.img]||c.img; }
+    else { el.classList.add("hidden"); el.removeAttribute("src"); }
+  }
+  $("zoomHint").classList.toggle("hidden",!c.img);
+}
+function show(){
+  const c=deck[idx];
+  phase="ask";
+  card.classList.remove("flipped","leave");
+  setPics(c);
+  $("topic").textContent=c.g||""; $("topic").classList.toggle("hidden",!c.g); $("term").textContent=c.t; $("termBack").textContent=c.t; $("term").style.fontSize=c.t.length>70?"1.45rem":c.t.length>35?"1.9rem":""; $("termBack").style.fontSize=c.t.length>70?"1.05rem":""; $("promptText").textContent=c.p||CONFIG.prompt||"";
+  input.value=""; input.disabled=false;
+  toggle(["checkBtn","skipBtn","hintBtn"],true); usedHint=false; $("hintline").classList.add("hidden"); $("hintline").innerHTML=""; toggle(["nextBtn","overrideBtn"],false);
+  $("hint").innerHTML='<kbd>Enter</kbd> check · <kbd>Shift</kbd>+<kbd>Enter</kbd> new line · <kbd>Alt</kbd>+<kbd>H</kbd> hint';
+  void card.offsetWidth; card.classList.add("enter");
+  setTimeout(()=>card.classList.remove("enter"),600);
+  setTimeout(()=>input.focus(),50);
+  updateStats();
+}
+function toggle(ids,on){ids.forEach(id=>$(id).classList.toggle("hidden",!on))}
+
+function check(skip=false){
+  if(phase!=="ask")return;
+  const c=deck[idx], typed=skip?"":input.value.trim();
+  if(!skip && !typed){card.classList.add("shake");setTimeout(()=>card.classList.remove("shake"),500);return}
+  phase="shown";
+  // best matching accepted answer
+  let best=null, bestI=0;
+  c.a.forEach((ans,i)=>{const r=compare(ans,typed); if(!best||r.score>best.score){best=r;bestI=i}});
+  const s=best.score;
+  const level = s>=90?"good": s>=65?"close":"bad";
+  const col = {good:"var(--good)",close:"var(--close)",bad:"var(--bad)"}[level];
+
+  // render answer words
+  $("answer").innerHTML = best.A.map((w,i)=>{
+    const cls = SOFT.has(w.n)?"soft": best.hitA.has(i)?"hit":"miss";
+    return `<span class="w ${cls}" style="animation-delay:${.35+i*.04}s">${esc(w.raw)}</span>`;
+  }).join("");
+  const others=c.a.filter((_,i)=>i!==bestI);
+  $("alt").textContent = c.show ? `Full definition: ${c.show}` : others.length ? `Also accepted: ${others.join(" / ")}` : "";
+  $("yours").innerHTML = typed ? best.T.map((w,i)=>
+      SOFT.has(w.n)||best.hitT.has(i)?esc(w.raw):`<span class="extra">${esc(w.raw)}</span>`).join(" ")
+    : "<em style='color:var(--muted)'>(skipped)</em>";
+
+  const ring=$("ring"); ring.style.setProperty("--c",col); ring.style.setProperty("--p",0);
+  $("pct").textContent="0%";
+  requestAnimationFrame(()=>requestAnimationFrame(()=>ring.style.setProperty("--p",s)));
+  countUp($("pct"),s);
+
+  const titles={good:["Spot on!","Word perfect.","Nailed it."],close:["Almost there","So close","Nearly"],bad:["Not yet","Keep at it","Learn this one"]};
+  $("vTitle").textContent = skip?"Here it is": pick(titles[level]);
+  $("vTitle").style.color = col;
+  const missing=[...best.A.keys()].filter(i=>!SOFT.has(best.A[i].n)&&!best.hitA.has(i)).length;
+  $("vSub").textContent = skip?"Have a read, it'll come back later.":
+    level==="good"? (missing?`Missed ${missing} word${missing>1?"s":""}, close enough.`:"Every key word.") :
+    `${missing} key word${missing!==1?"s":""} missing.`;
+  if(usedHint && !skip) $("vSub").textContent += " (used a hint)";
+
+  card.classList.add("flipped");
+  input.disabled=true;
+  toggle(["checkBtn","skipBtn","hintBtn"],false); toggle(["nextBtn"],true);
+  toggle(["overrideBtn"], level!=="good" && !skip);
+  $("hint").innerHTML='<kbd>Enter</kbd> next card';
+
+  if(level==="good"){ mark(true); setTimeout(()=>burst(),450); }
+  else { mark(false); setTimeout(()=>{card.classList.add("shake");setTimeout(()=>card.classList.remove("shake"),500)},800); }
+  setTimeout(()=>$("nextBtn").focus(),100);
+}
+let lastCorrect=null;
+function mark(ok){
+  lastCorrect=ok;
+  if(ok){right++;streak++;bumpStreak()} else {streak=0;missed.push(deck[idx])}
+  updateStats();
+}
+function override(){
+  if(lastCorrect)return;
+  missed.pop(); right++; streak++; lastCorrect=true; bumpStreak(); updateStats();
+  $("vTitle").textContent="Counted as correct"; $("vTitle").style.color="var(--good)";
+  toggle(["overrideBtn"],false); burst();
+}
+function bumpStreak(){const b=$("streakBox");b.classList.remove("bump");void b.offsetWidth;b.classList.add("bump")}
+function next(){
+  if(phase!=="shown")return;
+  phase="moving";
+  card.classList.add("leave");
+  setTimeout(()=>{ idx++; if(idx>=deck.length) finish(); else show(); },340);
+}
+function finish(){
+  $("bar").style.width="100%";
+  $("game").classList.add("hidden");
+  const pct=Math.round(right/deck.length*100);
+  const end=$("end"); end.classList.remove("hidden");
+  end.innerHTML=`<div class="done">
+    <h2>${pct===100?"Perfect round!":pct>=75?"Great round":"Round done"}</h2>
+    <div class="big">${right}/${deck.length}</div>
+    ${missed.length?`<p style="color:var(--muted);margin-top:10px">Still to learn:</p>
+      <div class="missed">${missed.map(c=>`<span>${esc(c.t)}</span>`).join("")}</div>`:"<p style='color:var(--muted);margin:10px 0 22px'>You got every one.</p>"}
+    <div class="row" style="justify-content:center">
+      ${missed.length?`<button class="btn primary" id="redoMissed">Redo the ${missed.length} I missed</button>`:""}
+      <button class="btn ghost" id="redoAll">Start over</button>
+    </div></div>`;
+  const m=[...missed];
+  if(m.length)$("redoMissed").onclick=()=>start(m);
+  $("redoAll").onclick=()=>start(current());
+  if(pct>=75){burst(innerWidth/2,innerHeight/3,140);setTimeout(()=>burst(innerWidth/3,innerHeight/2,90),250);setTimeout(()=>burst(innerWidth*2/3,innerHeight/2,90),450)}
+}
+function current(){return filter.size?CARDS.filter(c=>filter.has(c.g)):CARDS}
+const pick=a=>a[Math.random()*a.length|0];
+const esc=s=>s.replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+function countUp(el,to){const t0=performance.now();(function f(t){const k=Math.min(1,(t-t0)/1000);el.textContent=Math.round(to*(1-Math.pow(1-k,3)))+"%";if(k<1)requestAnimationFrame(f)})(t0)}
+
+let usedHint=false;
+function showHint(){
+  if(phase!=="ask"||usedHint)return;
+  usedHint=true;
+  const ans=deck[idx].a[0];
+  $("hintline").innerHTML = ans.split(/\s+/).map((w,i)=>{
+    const m=w.match(/^([A-Za-z0-9])(.*?)([.,;:]?)$/);
+    const body = m ? esc(m[1])+"<i>"+m[2].replace(/[A-Za-z0-9]/g,"_")+"</i>"+esc(m[3]) : esc(w);
+    return `<span class="w" style="animation-delay:${i*.05}s">${body}</span>`;
+  }).join("");
+  $("hintline").classList.remove("hidden");
+  toggle(["hintBtn"],false);
+  input.focus();
+}
+// ---------- events ----------
+$("hintBtn").onclick=showHint;
+document.addEventListener("keydown",e=>{if(e.altKey&&(e.code==="KeyH")){e.preventDefault();showHint()}});
+$("checkBtn").onclick=()=>check();
+$("skipBtn").onclick=()=>check(true);
+$("nextBtn").onclick=next;
+$("overrideBtn").onclick=override;
+input.addEventListener("keydown",e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();e.stopPropagation();check()}});
+document.addEventListener("keydown",e=>{if(e.key==="Enter"&&phase==="shown"&&document.activeElement!==$("overrideBtn")){e.preventDefault();next()}});
+// picture zoom: click an artwork/diagram to enlarge, click again or press Esc to close
+function openLb(src){ $("lbImg").src=src; $("lb").classList.remove("hidden"); }
+function closeLb(){ $("lb").classList.add("hidden"); $("lbImg").removeAttribute("src"); }
+["pic","picBack"].forEach(id=>$(id).addEventListener("click",e=>{e.stopPropagation(); if($(id).src) openLb($(id).src)}));
+$("lb").addEventListener("click",closeLb);
+document.addEventListener("keydown",e=>{if(e.key==="Escape")closeLb()});
+// a picture that fails to load just disappears, the card still works
+["pic","picBack"].forEach(id=>$(id).addEventListener("error",()=>{$(id).classList.add("hidden"); $("zoomHint").classList.add("hidden")}));
+document.title = CONFIG.title.replace(/<[^>]+>/g,"");
+$("title").innerHTML = CONFIG.title; $("subtitle").textContent = CONFIG.subtitle||"";
+(function buildChips(){
+  const groups=[...new Set(CARDS.map(c=>c.g).filter(Boolean))];
+  const chips=[["all",`All (${CARDS.length})`],...(groups.length>1?groups.map(g=>[g,g]):[])];
+  $("chips").innerHTML=chips.map(([v,l],i)=>`<button class="chip${i?"":" on"}" data-set="${esc(v)}">${esc(l)}</button>`).join("");
+  if(chips.length<2)$("chips").classList.add("hidden");
+})();
+// click = just that topic · shift/ctrl/cmd-click or press-and-hold = add/remove it from a multi-selection
+function pickChip(b,multi){
+  const v=b.dataset.set;
+  if(v==="all") filter.clear();
+  else if(multi){ filter.has(v)?filter.delete(v):filter.add(v); }
+  else { filter.clear(); filter.add(v); }
+  document.querySelectorAll(".chip").forEach(x=>x.classList.toggle("on", x.dataset.set==="all"? !filter.size : filter.has(x.dataset.set)));
+  start(current());
+}
+let holdT=null, held=false;
+$("chips").addEventListener("pointerdown",e=>{const b=e.target.closest(".chip"); if(!b)return; held=false; holdT=setTimeout(()=>{held=true;pickChip(b,true)},450)});
+["pointerup","pointerleave","pointercancel"].forEach(ev=>$("chips").addEventListener(ev,()=>clearTimeout(holdT)));
+$("chips").addEventListener("click",e=>{
+  const b=e.target.closest(".chip"); if(!b)return;
+  if(held){held=false;return}
+  pickChip(b,e.shiftKey||e.ctrlKey||e.metaKey);
+});
+
+// ---------- background: themed drifting particles (THEME.bg.kind) ----------
+const bg=$("bg"), bx=bg.getContext("2d"); let bits=[];
+const BG=THEME.bg||{kind:"arrows"}, BGC=BG.colors||[THEME.colors.accent,THEME.colors.accent2];
+function sizeBg(){bg.width=fx.width=innerWidth*devicePixelRatio;bg.height=fx.height=innerHeight*devicePixelRatio;
+  bx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0);fxx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0)}
+function mkBit(){
+  const r=Math.random, k=BG.kind, a=r()*6.28;
+  const b={x:r()*innerWidth,y:r()*innerHeight,col:BGC[r()*BGC.length|0],al:.15+r()*.3,ph:r()*6.28,sz:1.5+r()*3.5,vx:0,vy:0,len:0,ch:""};
+  if(k==="arrows"){const s=.15+r()*.35;b.vx=Math.cos(a)*s;b.vy=Math.sin(a)*s;b.len=10+r()*26}
+  else if(k==="embers"||k==="bubbles"){b.al=.3+r()*.45;b.vx=(r()-.5)*.35;b.vy=-(.2+r()*.6);b.sz=k==="bubbles"?3+r()*9:1.2+r()*2.8}
+  else if(k==="falling"){b.vx=(r()-.5)*.3;b.vy=.25+r()*.6;b.sz=1.5+r()*3}
+  else if(k==="symbols"){b.vx=(r()-.5)*.25;b.vy=-(.1+r()*.3);b.sz=14+r()*18;b.ch=BG.chars[r()*BG.chars.length|0]}
+  return b;   // "stars" = no velocity, just twinkles
+}
+function drawBg(t){
+  bx.clearRect(0,0,innerWidth,innerHeight);
+  const k=BG.kind;
+  for(const p of bits){
+    p.x+=p.vx;p.y+=p.vy;
+    if(p.x<-40)p.x=innerWidth+40; if(p.x>innerWidth+40)p.x=-40;
+    if(p.y<-40)p.y=innerHeight+40; if(p.y>innerHeight+40)p.y=-40;
+    bx.globalAlpha=p.al*(k==="arrows"?1:.55+.45*Math.sin(t/700+p.ph));bx.strokeStyle=bx.fillStyle=p.col;bx.shadowBlur=0;
+    if(k==="arrows"){
+      const ang=Math.atan2(p.vy,p.vx), ex=p.x+Math.cos(ang)*p.len, ey=p.y+Math.sin(ang)*p.len;
+      bx.lineWidth=1.4;bx.beginPath();bx.moveTo(p.x,p.y);bx.lineTo(ex,ey);
+      bx.lineTo(ex-Math.cos(ang-.5)*6,ey-Math.sin(ang-.5)*6);bx.moveTo(ex,ey);
+      bx.lineTo(ex-Math.cos(ang+.5)*6,ey-Math.sin(ang+.5)*6);bx.stroke();
+    }else if(k==="bubbles"){bx.lineWidth=1.2;bx.beginPath();bx.arc(p.x,p.y,p.sz,0,6.28);bx.stroke()}
+    else if(k==="symbols"){bx.font=p.sz+"px "+THEME.fonts.display+",serif";bx.fillText(p.ch,p.x,p.y)}
+    else{bx.shadowColor=p.col;bx.shadowBlur=k==="embers"?10:4;bx.beginPath();bx.arc(p.x,p.y,p.sz,0,6.28);bx.fill()}
+  }
+  bx.globalAlpha=1;bx.shadowBlur=0;
+  requestAnimationFrame(drawBg);
+}
+
+// ---------- fx: spark burst ----------
+const fx=$("fx"), fxx=fx.getContext("2d"); let parts=[], fxRunning=false;
+function burst(x,y,n=70){
+  const r=card.getBoundingClientRect(); x??=r.left+r.width/2; y??=r.top+r.height/2;
+  const cols=THEME.confetti||[THEME.colors.accent,THEME.colors.accent2,"#ffffff"];
+  for(let i=0;i<n;i++){const a=Math.random()*Math.PI*2,s=3+Math.random()*7;
+    parts.push({x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s-2,life:1,c:pick(cols),sz:2+Math.random()*3,rot:Math.random()*6,vr:(Math.random()-.5)*.3})}
+  if(!fxRunning){fxRunning=true;requestAnimationFrame(tick)}
+}
+function tick(){
+  fxx.clearRect(0,0,innerWidth,innerHeight);
+  parts=parts.filter(p=>p.life>0);
+  for(const p of parts){p.vy+=.18;p.vx*=.985;p.x+=p.vx;p.y+=p.vy;p.life-=.012;p.rot+=p.vr;
+    fxx.save();fxx.globalAlpha=Math.max(0,p.life);fxx.fillStyle=p.c;fxx.translate(p.x,p.y);fxx.rotate(p.rot);
+    fxx.fillRect(-p.sz,-p.sz/2,p.sz*2,p.sz);fxx.restore()}
+  if(parts.length)requestAnimationFrame(tick); else {fxRunning=false;fxx.clearRect(0,0,innerWidth,innerHeight)}
+}
+
+addEventListener("resize",sizeBg);
+sizeBg(); bits=Array.from({length:Math.min(BG.count||70,innerWidth/18|0)},mkBit); requestAnimationFrame(drawBg);
+start(CARDS);
+</script>
+</body>
+</html>
